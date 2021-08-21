@@ -244,7 +244,7 @@ export class MToonMaterial extends PushMaterial {
      * Does the transparency come from the diffuse texture alpha channel.
      */
     @expandToProperty("_markAllSubMeshesAsTexturesAndMiscDirty")
-    public useAlphaFromDiffuseTexture: boolean;
+    public useAlphaFromDiffuseTexture!: boolean;
     /**
      * アルファテスト時のカットしきい値
      */
