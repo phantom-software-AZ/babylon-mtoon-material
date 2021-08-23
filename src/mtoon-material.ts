@@ -21,13 +21,13 @@ import { MToonMaterialDefines } from './mtoon-material-defines';
 import { MToonOutlineRenderer } from './mtoon-outline-renderer';
 
 // シェーダ文字列を取得
-const UboDeclaration = require('./shaders/ubo-declaration.vert').default;
-const VertexDeclaration = require('./shaders/vertex-declaration.vert').default;
-const FragmentDeclaration = require('./shaders/fragment-declaration.frag').default;
-const BumpFragment = require('./shaders/bump-fragment.frag').default;
-const LightFragment = require('./shaders/light-fragment.frag').default;
-const VertexShader = require('./shaders/mtoon.vert').default;
-const FragmentShader = require('./shaders/mtoon.frag').default;
+const UboDeclaration = require('./shaders/ubo-declaration.vert');
+const VertexDeclaration = require('./shaders/vertex-declaration.vert');
+const FragmentDeclaration = require('./shaders/fragment-declaration.frag');
+const BumpFragment = require('./shaders/bump-fragment.frag');
+const LightFragment = require('./shaders/light-fragment.frag');
+const VertexShader = require('./shaders/mtoon.vert');
+const FragmentShader = require('./shaders/mtoon.frag');
 
 /**
  * デバッグモード
