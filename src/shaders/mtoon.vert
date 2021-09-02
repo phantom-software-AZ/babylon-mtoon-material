@@ -105,6 +105,7 @@ void main(void) {
     vec4 tangentUpdated = tangent;
 #endif
 
+#include<morphTargetsVertexGlobal>
 #include<morphTargetsVertex>[0..maxSimultaneousMorphTargets]
 
 #include<instancesVertex>

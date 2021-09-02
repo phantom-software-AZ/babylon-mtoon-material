@@ -1,33 +1,39 @@
-import { Constants } from '@babylonjs/core/Engines/constants';
-import { Effect, IEffectCreationOptions } from '@babylonjs/core/Materials/effect';
-import { EffectFallbacks } from '@babylonjs/core/Materials/effectFallbacks';
-import { ICustomShaderNameResolveOptions, Material } from '@babylonjs/core/Materials/material';
-import { MaterialHelper } from '@babylonjs/core/Materials/materialHelper';
-import { PushMaterial } from '@babylonjs/core/Materials/pushMaterial';
-import { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture';
-import { Color3, Matrix, Vector4 } from '@babylonjs/core/Maths/math';
-import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh';
-import { VertexBuffer } from '@babylonjs/core/Meshes/buffer';
-import { Mesh } from '@babylonjs/core/Meshes/mesh';
-import { SubMesh } from '@babylonjs/core/Meshes/subMesh';
-import { expandToProperty, SerializationHelper, serialize, serializeAsColor3, serializeAsTexture } from '@babylonjs/core/Misc/decorators';
-import { IAnimatable } from '@babylonjs/core/Animations/animatable.interface';
-import { Scene } from '@babylonjs/core/scene';
-import { Nullable } from '@babylonjs/core/types';
-import { PrePassConfiguration } from '@babylonjs/core/Materials/prePassConfiguration';
-import { DetailMapConfiguration } from '@babylonjs/core/Materials/material.detailMapConfiguration';
-import { getInspectableCustomProperties } from './inspectable-custom-properties';
-import { MToonMaterialDefines } from './mtoon-material-defines';
-import { MToonOutlineRenderer } from './mtoon-outline-renderer';
+import { serialize, SerializationHelper, serializeAsColor3, expandToProperty, serializeAsTexture } from "@babylonjs/core/Misc/decorators";
+import { IAnimatable } from "@babylonjs/core/Animations/animatable.interface";
+
+import { Nullable } from "@babylonjs/core/types";
+import { Scene } from "@babylonjs/core/scene";
+import { Matrix, Color3, Vector4 } from "@babylonjs/core/Maths/math";
+import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
+import { SubMesh } from "@babylonjs/core/Meshes/subMesh";
+import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { PrePassConfiguration } from "@babylonjs/core/Materials/prePassConfiguration";
+
+import { Material, ICustomShaderNameResolveOptions } from "@babylonjs/core/Materials/material";
+import { PushMaterial } from "@babylonjs/core/Materials/pushMaterial";
+import { MaterialHelper } from "@babylonjs/core/Materials/materialHelper";
+
+import { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
+
+import { Constants } from "@babylonjs/core/Engines/constants";
+import { EffectFallbacks } from "@babylonjs/core/Materials/effectFallbacks";
+import { Effect, IEffectCreationOptions } from "@babylonjs/core/Materials/effect";
+import { DetailMapConfiguration } from "@babylonjs/core/Materials/material.detailMapConfiguration";
+
+import { getInspectableCustomProperties } from "./inspectable-custom-properties";
+import { MToonMaterialDefines } from "./mtoon-material-defines";
+import { MToonOutlineRenderer } from "./mtoon-outline-renderer";
+import {_TypeStore} from "@babylonjs/core";
 
 // シェーダ文字列を取得
-const UboDeclaration = require('./shaders/ubo-declaration.vert');
-const VertexDeclaration = require('./shaders/vertex-declaration.vert');
-const FragmentDeclaration = require('./shaders/fragment-declaration.frag');
-const BumpFragment = require('./shaders/bump-fragment.frag');
-const LightFragment = require('./shaders/light-fragment.frag');
-const VertexShader = require('./shaders/mtoon.vert');
-const FragmentShader = require('./shaders/mtoon.frag');
+const UboDeclaration = require("./shaders/ubo-declaration.vert");
+const VertexDeclaration = require("./shaders/vertex-declaration.vert");
+const FragmentDeclaration = require("./shaders/fragment-declaration.frag");
+const BumpFragment = require("./shaders/bump-fragment.frag");
+const LightFragment = require("./shaders/light-fragment.frag");
+const VertexShader = require("./shaders/mtoon.vert");
+const FragmentShader = require("./shaders/mtoon.frag");
 
 /**
  * デバッグモード
@@ -76,95 +82,107 @@ const onCreatedEffectParameters = { effect: null as unknown as Effect, subMesh: 
 export class MToonMaterial extends PushMaterial {
 //#region Properties
 //#region Textures
-    @serializeAsTexture('diffuseTexture')
+    @serializeAsTexture("diffuseTexture")
     private _diffuseTexture: Nullable<BaseTexture> = null;
     /**
-     * 通常色テクスチャ
+     * The basic texture of the material as viewed under a light.
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesAndMiscDirty')
-    public diffuseTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesAndMiscDirty")
+    public diffuseTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('emissiveTexture')
+    @serializeAsTexture("emissiveTexture")
     private _emissiveTexture: Nullable<BaseTexture> = null;
     /**
-     * 発光テクスチャ
+     * Define texture of the material as if self lit.
+     * This will be mixed in the final result even in the absence of light.
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public emissiveTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public emissiveTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('bumpTexture')
+    @serializeAsTexture("specularTexture")
+    private _specularTexture: Nullable<BaseTexture> = null;
+    /**
+     * Define how the color and intensity of the highlight given by the light in the material.
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public specularTexture!: Nullable<BaseTexture>;
+
+    @serializeAsTexture("bumpTexture")
     private _bumpTexture: Nullable<BaseTexture> = null;
     /**
-     * バンプマップテクスチャ
+     * Bump mapping is a technique to simulate bump and dents on a rendered surface.
+     * These are made by creating a normal map from an image. The means to do this can be found on the web, a search for 'normal map generator' will bring up free and paid for methods of doing this.
+     * @see https://doc.babylonjs.com/how_to/more_materials#bump-map
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public bumpTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public bumpTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('shadeTexture')
+    @serializeAsTexture("shadeTexture")
     private _shadeTexture: Nullable<BaseTexture> = null;
     /**
      * 陰になる部分の色テクスチャ
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public shadeTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public shadeTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('receiveShadowTexture')
+    @serializeAsTexture("receiveShadowTexture")
     private _receiveShadowTexture: Nullable<BaseTexture> = null;
     /**
      * どれだけ影を受け付けるかのテクスチャ
      * receiveShadowRate * texture.a
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public receiveShadowTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public receiveShadowTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('shadingGradeTexture')
+    @serializeAsTexture("shadingGradeTexture")
     private _shadingGradeTexture: Nullable<BaseTexture> = null;
     /**
      * 陰部分の暗さテクスチャ
      * shadingGradeRate * (1.0 - texture.r))
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public shadingGradeTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public shadingGradeTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('rimTexture')
+    @serializeAsTexture("rimTexture")
     private _rimTexture: Nullable<BaseTexture> = null;
     /**
      * Parametric Rim Lighting テクスチャ
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public rimTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public rimTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('matCapTexture')
+    @serializeAsTexture("matCapTexture")
     private _matCapTexture: Nullable<BaseTexture> = null;
     /**
      * MatCap ライティングテクスチャ
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public matCapTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public matCapTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('outlineWidthTexture')
+    @serializeAsTexture("outlineWidthTexture")
     private _outlineWidthTexture: Nullable<BaseTexture> = null;
     /**
      * アウトラインの幅の調整テクスチャ
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public outlineWidthTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public outlineWidthTexture!: Nullable<BaseTexture>;
 
-    @serializeAsTexture('outlineWidthTexture')
+    @serializeAsTexture("uvAnimationMaskTexture")
     private _uvAnimationMaskTexture: Nullable<BaseTexture> = null;
     /**
      * UV アニメーションマスクテクスチャ
      */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public uvAnimationMaskTexture: Nullable<BaseTexture> = null;
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public uvAnimationMaskTexture!: Nullable<BaseTexture>;
 
     /**
-     * テクスチャ参照の一覧
+     * アクティブなテクスチャ参照の一覧
      */
-    protected get appendedTextures(): Array<Nullable<BaseTexture>> {
+    private appendedActiveTextures(): BaseTexture[] {
         return [
             this._diffuseTexture,
             this._emissiveTexture,
+            this._specularTexture,
             this._bumpTexture,
             this._shadeTexture,
             this._receiveShadowTexture,
@@ -173,25 +191,163 @@ export class MToonMaterial extends PushMaterial {
             this._matCapTexture,
             this._outlineWidthTexture,
             this._uvAnimationMaskTexture,
-        ];
+        ].filter((t) => t !== null) as BaseTexture[];
     }
+//#endregion
+
+//#region Colors
     /**
-     * アクティブなテクスチャ参照の一覧
+     * The color of the material lit by the environmental background lighting.
+     * @see https://doc.babylonjs.com/babylon101/materials#ambient-color-example
      */
-    protected get appendedActiveTextures(): BaseTexture[] {
-        return this.appendedTextures.filter((t) => t !== null) as BaseTexture[];
-    }
+    @serializeAsColor3("ambient")
+    public ambientColor = new Color3(0, 0, 0);
+
+    /**
+     * The basic color of the material as viewed under a light.
+     */
+    @serializeAsColor3("diffuse")
+    public diffuseColor = new Color3(1, 1, 1);
+
+    /**
+     * Define how the color and intensity of the highlight given by the light in the material.
+     */
+    @serializeAsColor3("specular")
+    public specularColor = new Color3(1, 1, 1);
+
+    /**
+     * Define the color of the material as if self lit.
+     * This will be mixed in the final result even in the absence of light.
+     */
+    @serializeAsColor3("emissive")
+    public emissiveColor = new Color3(0, 0, 0);
+
+    /**
+     * shadeTexture に乗算される色
+     */
+    @serializeAsColor3("shade")
+    public shadeColor = new Color3(0.97, 0.81, 0.86);
+    /**
+     * Rim の色
+     */
+    @serializeAsColor3("rim")
+    public rimColor = new Color3(0, 0, 0);
+    /**
+     * アウトラインの色
+     */
+    @serializeAsColor3("outline")
+    public outlineColor = new Color3(0, 0, 0);
 //#endregion
 
 //#region babylon parameters
     /**
-     * 対応最大ライト数
+     * Defines how sharp are the highlights in the material.
+     * The bigger the value the sharper giving a more glossy feeling to the result.
+     * Reversely, the smaller the value the blurrier giving a more rough feeling to the result.
      */
-    public readonly maxSimultaneousLights = 16;
+    @serialize()
+    public specularPower = 64;
+
+    @serialize("useAlphaFromDiffuseTexture")
+    private _useAlphaFromDiffuseTexture = true;
     /**
-     * Specular 非対応
+     * Does the transparency come from the diffuse texture alpha channel.
      */
-    public readonly specularSupported = false;
+    @expandToProperty("_markAllSubMeshesAsTexturesAndMiscDirty")
+    public useAlphaFromDiffuseTexture!: boolean;
+
+    @serialize("useEmissiveAsIllumination")
+    private _useEmissiveAsIllumination = false;
+    /**
+     * If true, the emissive value is added into the end result, otherwise it is multiplied in.
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public useEmissiveAsIllumination!: boolean;
+
+    @serialize("linkEmissiveWithDiffuse")
+    private _linkEmissiveWithDiffuse = false;
+    /**
+     * If true, some kind of energy conservation will prevent the end result to be more than 1 by reducing
+     * the emissive level when the final color is close to one.
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public linkEmissiveWithDiffuse!: boolean;
+
+    @serialize("useSpecularOverAlpha")
+    private _useSpecularOverAlpha = false;
+    /**
+     * Specifies that the material will keep the specular highlights over a transparent surface (only the most luminous ones).
+     * A car glass is a good exemple of that. When sun reflects on it you can not see what is behind.
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public useSpecularOverAlpha!: boolean;
+
+    @serialize("disableLighting")
+    private _disableLighting = false;
+    /**
+     * Does lights from the scene impacts this material.
+     * It can be a nice trick for performance to disable lighting on a fully emissive material.
+     */
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public disableLighting!: boolean;
+
+    @serialize("useObjectSpaceNormalMap")
+    private _useObjectSpaceNormalMap = false;
+    /**
+     * Allows using an object space normal map (instead of tangent space).
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public useObjectSpaceNormalMap!: boolean;
+
+    @serialize("useParallax")
+    private _useParallax = false;
+    /**
+     * Is parallax enabled or not.
+     * @see https://doc.babylonjs.com/how_to/using_parallax_mapping
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public useParallax!: boolean;
+
+    @serialize("useParallaxOcclusion")
+    private _useParallaxOcclusion = false;
+    /**
+     * Is parallax occlusion enabled or not.
+     * If true, the outcome is way more realistic than traditional Parallax but you can expect a performance hit that worthes consideration.
+     * @see https://doc.babylonjs.com/how_to/using_parallax_mapping
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public useParallaxOcclusion!: boolean;
+
+    /**
+     * Defines the alpha limits in alpha test mode.
+     */
+    @serialize()
+    public alphaCutOff = 0.4;
+
+    @serialize("useGlossinessFromSpecularMapAlpha")
+    private _useGlossinessFromSpecularMapAlpha = false;
+    /**
+     * Defines if the glossiness/roughness of the material should be read from the specular map alpha channel
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public useGlossinessFromSpecularMapAlpha!: boolean;
+
+    @serialize("maxSimultaneousLights")
+    private _maxSimultaneousLights = 16;
+    /**
+     * Defines the maximum number of lights that can be used in the material
+     */
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public maxSimultaneousLights!: number;
+
+    @serialize("twoSidedLighting")
+    private _twoSidedLighting = false;
+    /**
+     * If sets to true and backfaceCulling is false, normals will be flipped on the backside.
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public twoSidedLighting!: boolean;
+
     /**
      * 頂点カラー非対応
      */
@@ -208,311 +364,141 @@ export class MToonMaterial extends PushMaterial {
      * 頂点アルファは非対応
      */
     public readonly useVertexAlpha = false;
-    private _useLogarithmicDepth = false;
     /**
-     * Logarithmic depth
-     * @link http://doc.babylonjs.com/how_to/using_logarithmic_depth_buffer
+     * Defines additional PrePass parameters for the material.
      */
-    @serialize()
-    public get useLogarithmicDepth(): boolean {
-        return this._useLogarithmicDepth;
-    }
-    public set useLogarithmicDepth(value: boolean) {
-        const newValue = value && this.getScene().getEngine().getCaps().fragmentDepthSupported;
-        if (this._useLogarithmicDepth !== newValue) {
-            this._useLogarithmicDepth = newValue;
-            this._markAllSubMeshesAsMiscDirty();
-        }
-    }
-    @serialize('disableLighting')
-    private _disableLighting = false;
-    /**
-     * ライティングを無効にするかどうか
-     */
-    @expandToProperty('_markAllSubMeshesAsLightsDirty')
-    public disableLighting = false;
-    @serialize('twoSidedLighting')
-    private _twoSidedLighting = false;
-    /**
-     * 両面ライティングを行うかどうか
-     */
-    @expandToProperty('_markAllSubMeshesAsTexturesDirty')
-    public twoSidedLighting = false;
-    @serialize('useAlphaFromDiffuseTexture')
-    private _useAlphaFromDiffuseTexture = true;
-    /**
-     * Does the transparency come from the diffuse texture alpha channel.
-     */
-    @expandToProperty("_markAllSubMeshesAsTexturesAndMiscDirty")
-    public useAlphaFromDiffuseTexture!: boolean;
-    /**
-     * アルファテスト時のカットしきい値
-     */
-    @serialize()
-    @expandToProperty('_markAllSubMeshesAsLightsDirty')
-    public alphaCutOff = 0.5;
-    private _rebuildInParallel = false;
-    public get isPrePassCapable(): boolean {
-        return false;
-    }
+    public readonly prePassConfiguration: PrePassConfiguration;
+
     public get canRenderToMRT() {
         return false;
     }
-    public readonly prePassConfiguration: PrePassConfiguration;
-    public readonly detailMap = new DetailMapConfiguration(this._markAllSubMeshesAsTexturesDirty.bind(this));
-//#endregion
 
-//#region Colors
     /**
-     * diffuseTexture に乗算される色
+     * Defines the detail map parameters for the material.
      */
-    @serializeAsColor3('diffuse')
-    public diffuseColor = new Color3(1.0, 1.0, 1.0);
-    /**
-     * 環境光
-     */
-    @serialize('ambient')
-    public ambientColor = new Color3(0.1, 0.1, 0.1);
-    /**
-     * シーンの AmbientColor と掛け合わせた後の色
-     * @see bindForSubMesh
-     * @hidden
-     */
-    protected globalAmbientColor = new Color3(0.0, 0.0, 0.0);
-    /**
-     * 純粋加算される発光色
-     */
-    @serialize('emissive')
-    public emissiveColor = new Color3(0.0, 0.0, 0.0);
-    /**
-     * shadeTexture に乗算される色
-     */
-    @serialize('shade')
-    public shadeColor = new Color3(0.97, 0.81, 0.86);
-    /**
-     * Rim の色
-     */
-    @serialize('rim')
-    public rimColor = new Color3(0.0, 0.0, 0.0);
-    /**
-     * アウトラインの色
-     */
-    @serialize('outline')
-    public outlineColor = new Color3(0.0, 0.0, 0.0);
+    public readonly detailMap = new DetailMapConfiguration(this._markAllSubMeshesAsTexturesDirty.bind(this));
+
+    protected _worldViewProjectionMatrix = Matrix.Zero();
+    protected _globalAmbientColor = new Color3(0, 0, 0);
+    protected _useLogarithmicDepth!: boolean;
+    protected _rebuildInParallel = false;
 //#endregion
 
 //#region MToon parameters
-    private _bumpScale = 1.0;
-    @serialize()
-    public get bumpScale() {
-        return this._bumpScale;
-    }
-    public set bumpScale(value: number) {
-        this._bumpScale = value;
-    }
-    private _receiveShadowRate = 1.0;
-    @serialize()
-    public get receiveShadowRate() {
-        return this._receiveShadowRate;
-    }
-    public set receiveShadowRate(value: number) {
-        this._receiveShadowRate = Math.max(0.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _shadingGradeRate = 1.0;
-    @serialize()
-    public get shadingGradeRate() {
-        return this._shadingGradeRate;
-    }
-    public set shadingGradeRate(value: number) {
-        this._shadingGradeRate = Math.max(0.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _shadeShift = 0.0;
-    @serialize()
-    public get shadeShift() {
-        return this._shadeShift;
-    }
-    public set shadeShift(value: number) {
-        this._shadeShift = Math.max(-1.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _shadeToony = 0.9;
-    @serialize()
-    public get shadeToony() {
-        return this._shadeToony;
-    }
-    public set shadeToony(value: number) {
-        this._shadeToony = Math.max(0.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _lightColorAttenuation = 0.0;
-    @serialize()
-    public get lightColorAttenuation() {
-        return this._lightColorAttenuation;
-    }
-    public set lightColorAttenuation(value: number) {
-        this._lightColorAttenuation = Math.max(0.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _indirectLightIntensity = 0.1;
-    @serialize()
-    public get indirectLightIntensity() {
-        return this._indirectLightIntensity;
-    }
-    public set indirectLightIntensity(value: number) {
-        this._indirectLightIntensity = Math.max(0.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _rimLightingMix = 0;
-    @serialize()
-    public get rimLightingMix() {
-        return this._rimLightingMix;
-    }
-    public set rimLightingMix(value: number) {
-        this._rimLightingMix = Math.max(0.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _rimFresnelPower = 1;
-    @serialize()
-    public get rimFresnelPower() {
-        return this._rimFresnelPower;
-    }
-    public set rimFresnelPower(value: number) {
-        this._rimFresnelPower = Math.max(0.0, Math.min(100.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _rimLift = 0;
-    @serialize()
-    public get rimLift() {
-        return this._rimLift;
-    }
-    public set rimLift(value: number) {
-        this._rimLift = Math.max(0.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsLightsDirty();
-    }
-    private _outlineWidth = 0.5;
-    @serialize()
-    public get outlineWidth() {
-        return this._outlineWidth;
-    }
-    public set outlineWidth(value: number) {
-        this._outlineWidth = Math.max(0.01, Math.min(1.0, value));
-        this._markAllSubMeshesAsAttributesDirty();
-    }
-    private _outlineScaledMaxDistance = 1.0;
-    @serialize()
-    public get outlineScaledMaxDistance() {
-        return this._outlineScaledMaxDistance;
-    }
-    public set outlineScaledMaxDistance(value: number) {
-        this._outlineScaledMaxDistance = Math.max(1.0, Math.min(10.0, value));
-        this._markAllSubMeshesAsAttributesDirty();
-    }
-    private _outlineLightingMix = 1.0;
-    @serialize()
-    public get outlineLightingMix() {
-        return this._outlineLightingMix;
-    }
-    public set outlineLightingMix(value: number) {
-        this._outlineLightingMix = Math.max(0.0, Math.min(1.0, value));
-        this._markAllSubMeshesAsAttributesDirty();
-    }
-    private _uvAnimationScrollX = 0.0;
-    @serialize()
-    public get uvAnimationScrollX() {
-        return this._uvAnimationScrollX;
-    }
-    public set uvAnimationScrollX(value: number) {
-        this._uvAnimationScrollX = value;
-        this._markAllSubMeshesAsMiscDirty();
-    }
-    private _uvAnimationScrollY = 0.0;
-    @serialize()
-    public get uvAnimationScrollY() {
-        return this._uvAnimationScrollY;
-    }
-    public set uvAnimationScrollY(value: number) {
-        this._uvAnimationScrollY = value;
-        this._markAllSubMeshesAsMiscDirty();
-    }
-    private _uvAnimationRotation = 0.0;
-    @serialize()
-    public get uvAnimationRotation() {
-        return this._uvAnimationRotation;
-    }
-    public set uvAnimationRotation(value: number) {
-        this._uvAnimationRotation = value;
-        this._markAllSubMeshesAsMiscDirty();
-    }
+    @serialize("bumpScale")
+    private _bumpScale = 1;
+    @expandToProperty("_markAllSubMeshesAsTexturesAndMiscDirty")
+    public bumpScale!: number;
 
-    @serialize('alphaTest')
-    private _alphaTest = false;
+    /**
+     * Apply a scaling factor that determine which "depth" the height map should reprensent. A value between 0.05 and 0.1 is reasonnable in Parallax, you can reach 0.2 using Parallax Occlusion.
+     */
     @serialize()
-    public get alphaTest() {
-        return this._alphaTest;
-    }
-    public set alphaTest(value: boolean) {
-        this._alphaTest = value;
-        if (value) {
-            if (this.alphaBlend) {
-                this._transparencyMode = Material.MATERIAL_ALPHATESTANDBLEND;
-            } else {
-                this._transparencyMode = Material.MATERIAL_ALPHATEST;
-            }
-        } else {
-            this._transparencyMode = Material.MATERIAL_OPAQUE;
-        }
-        this._markAllSubMeshesAsMiscDirty();
-    }
-    private _alphaBlend = false;
-    @serialize()
-    public get alphaBlend() {
-        return this._alphaBlend;
-    }
-    public set alphaBlend(value: boolean) {
-        this._alphaBlend = value;
-        if (value) {
-            this.backFaceCulling = true;
-            if (this.alphaTest) {
-                this._transparencyMode = Material.MATERIAL_ALPHATESTANDBLEND;
-            } else {
-                this._transparencyMode = Material.MATERIAL_ALPHABLEND;
-            }
-        } else {
-            this._transparencyMode = Material.MATERIAL_OPAQUE;
-        }
-        this._markAllSubMeshesAsMiscDirty();
-    }
-    @serialize('debugMode')
+    public parallaxScaleBias = this._bumpScale;
+
+    @serialize("receiveShadowRate")
+    private _receiveShadowRate = 1;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public receiveShadowRate!: number;
+
+    @serialize("shadingGradeRate")
+    private _shadingGradeRate = 1;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public shadingGradeRate!: number;
+
+    @serialize("shadeShift")
+    private _shadeShift = 0;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public shadeShift!: number;
+
+    @serialize("shadeToony")
+    private _shadeToony = 0.9;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public shadeToony!: number;
+
+    @serialize("lightColorAttenuation")
+    private _lightColorAttenuation = 0;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public lightColorAttenuation!: number;
+
+    @serialize("indirectLightIntensity")
+    private _indirectLightIntensity = 0.1;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public indirectLightIntensity!: number;
+
+    @serialize("rimLightingMix")
+    private _rimLightingMix = 0;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public rimLightingMix!: number;
+
+    @serialize("rimFresnelPower")
+    private _rimFresnelPower = 1;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public rimFresnelPower!: number;
+
+    @serialize("rimLift")
+    private _rimLift = 0;
+    @expandToProperty("_markAllSubMeshesAsLightsDirty")
+    public rimLift!: number;
+
+    @serialize("outlineWidth")
+    private _outlineWidth = 0.5;
+    @expandToProperty("_markAllSubMeshesAsAttributesDirty")
+    public outlineWidth!: number;
+
+    @serialize("outlineScaledMaxDistance")
+    private _outlineScaledMaxDistance = 1;
+    @expandToProperty("_markAllSubMeshesAsAttributesDirty")
+    public outlineScaledMaxDistance!: number;
+
+    @serialize("outlineLightingMix")
+    private _outlineLightingMix = 1;
+    @expandToProperty("_markAllSubMeshesAsAttributesDirty")
+    public outlineLightingMix!: number;
+
+    @serialize("uvAnimationScrollX")
+    private _uvAnimationScrollX = 0;
+    @expandToProperty("_markAllSubMeshesAsMiscDirty")
+    public uvAnimationScrollX!: number;
+
+    @serialize("uvAnimationScrollY")
+    private _uvAnimationScrollY = 0;
+    @expandToProperty("_markAllSubMeshesAsMiscDirty")
+    public uvAnimationScrollY!: number;
+
+    @serialize("uvAnimationRotation")
+    private _uvAnimationRotation = 0;
+    @expandToProperty("_markAllSubMeshesAsMiscDirty")
+    public uvAnimationRotation!: number;
+
+    @serialize("debugMode")
     private _debugMode = DebugMode.None;
     /** @hidden */
-    @expandToProperty('_markAllSubMeshesAsMiscDirty')
+    @expandToProperty("_markAllSubMeshesAsMiscDirty")
     public debugMode: DebugMode = DebugMode.None;
 
-    private outlineRenderer?: MToonOutlineRenderer;
+    /**
+     * MToon Outline Renderer
+     * @private
+     */
+    private outlineRenderer = new MToonOutlineRenderer(this.getScene(), this);
+
+    @serialize("outlineWidthMode")
     private _outlineWidthMode: OutlineWidthMode = OutlineWidthMode.None;
-    public get outlineWidthMode() {
-        return this._outlineWidthMode;
-    }
-    public set outlineWidthMode(value: OutlineWidthMode) {
-        this._outlineWidthMode = value;
-        if (value !== OutlineWidthMode.None && !this.outlineRenderer) {
-            /**
-             * このマテリアル用のアウトラインレンダラーを生成する
-             */
-            this.outlineRenderer = new MToonOutlineRenderer(this.getScene(), this);
-        }
-        this._markAllSubMeshesAsMiscDirty();
-    }
-    @expandToProperty('_markAllSubMeshesAsMiscDirty')
+    @expandToProperty("_markAllSubMeshesAsMiscDirty")
+    public outlineWidthMode: OutlineWidthMode = OutlineWidthMode.None;
+
+    @serialize("outlineColorMode")
+    private _outlineColorMode: OutlineColorMode = OutlineColorMode.MixedLighting;
+    @expandToProperty("_markAllSubMeshesAsMiscDirty")
     public outlineColorMode: OutlineColorMode = OutlineColorMode.MixedLighting;
 
+    @serialize("cullMode")
     private _cullMode: CullMode = CullMode.Back;
-    @serialize()
     public get cullMode() {
       return this._cullMode;
     }
+
     public set cullMode(value: CullMode) {
         this._cullMode = value;
         switch (this._cullMode) {
@@ -520,13 +506,13 @@ export class MToonMaterial extends PushMaterial {
                 // 両面を描画する
                 this.backFaceCulling = false;
                 this.sideOrientation = Material.ClockWiseSideOrientation;
-                this.twoSidedLighting = false;
+                this.twoSidedLighting = true;
                 break;
             case CullMode.Front:
                 // 表面を描画しない(=裏面だけ描画する)
                 this.backFaceCulling = true;
                 this.sideOrientation = Material.CounterClockWiseSideOrientation;
-                this.twoSidedLighting = true;
+                this.twoSidedLighting = false;
                 break;
             case CullMode.Back:
                 // 裏面を描画しない(=表面だけ描画する) デフォルト
@@ -535,13 +521,15 @@ export class MToonMaterial extends PushMaterial {
                 this.twoSidedLighting = false;
                 break;
         }
-        this._markAllSubMeshesAsMiscDirty();
+        this.markAsDirty(Material.TextureDirtyFlag);
     }
-    @serialize()
+
+    @serialize("outlineCullMode")
     private _outlineCullMode = CullMode.Front;
-    @expandToProperty('_markAllSubMeshesAsMiscDirty')
+    @expandToProperty("_markAllSubMeshesAsMiscDirty")
     public outlineCullMode: CullMode = CullMode.Front;
     private storedCullMode = CullMode.Back;
+
     /**
      * アウトライン用 CullMode を設定
      * @hidden
@@ -550,6 +538,7 @@ export class MToonMaterial extends PushMaterial {
         this.storedCullMode = this.cullMode;
         this.cullMode = this._outlineCullMode;
     }
+
     /**
      * CullMode をリストア
      * @hidden
@@ -557,20 +546,21 @@ export class MToonMaterial extends PushMaterial {
     public restoreOutlineCullMode(): void {
         this.cullMode = this.storedCullMode;
     }
+
     /**
      * @hidden
      */
     public getOutlineRendererName(): string {
-        if (!this.outlineRenderer) {
-            return '';
-        }
-        return this.outlineRenderer.name;
+        return this.outlineRenderer ? this.outlineRenderer.name : "";
     }
 //#endregion
 //#endregion
 
     /**
-     * @inheritdoc
+     * Instantiates a new MToon material.
+     * @see https://vrm.dev/en/docs/univrm/shaders/shader_mtoon/
+     * @param name Define the name of the material in the scene
+     * @param scene Define the scene the material belong to
      */
     public constructor(name: string, scene: Scene) {
         super(name, scene);
@@ -578,7 +568,7 @@ export class MToonMaterial extends PushMaterial {
         this.prePassConfiguration = new PrePassConfiguration();
 
         // シェーダストアに登録する
-        if (!Effect.IncludesShadersStore.mtoonUboDeclaration) {
+        if (!Effect.ShadersStore.mtoonVertexShader || !Effect.ShadersStore.mtoonFragmentShader) {
             Effect.IncludesShadersStore.mtoonUboDeclaration = UboDeclaration;
             Effect.IncludesShadersStore.mtoonVertexDeclaration = VertexDeclaration;
             Effect.IncludesShadersStore.mtoonFragmentDeclaration = FragmentDeclaration;
@@ -588,14 +578,87 @@ export class MToonMaterial extends PushMaterial {
             Effect.ShadersStore.mtoonFragmentShader = FragmentShader;
         }
 
-        // Inspector にプロパティを追加
-        this.inspectableCustomProperties = this.inspectableCustomProperties || [];
-        this.inspectableCustomProperties.concat(getInspectableCustomProperties());
+        // Append custom inspectors
+        this.inspectableCustomProperties?.concat(getInspectableCustomProperties());
     }
 
     /**
-     * @inheritdoc
-     * SubMesh が利用可能かどうかチェックする
+     * Gets the current class name of the material e.g. "StandardMaterialTs"
+     * Mainly use in serialization.
+     * @returns the class name
+     */
+    public getClassName(): string {
+        return "MToonMaterial";
+    }
+
+    /**
+     * In case the depth buffer does not allow enough depth precision for your scene (might be the case in large scenes)
+     * You can try switching to logarithmic depth.
+     * @see https://doc.babylonjs.com/how_to/using_logarithmic_depth_buffer
+     */
+    @serialize()
+    public get useLogarithmicDepth(): boolean {
+        return this._useLogarithmicDepth;
+    }
+    public set useLogarithmicDepth(value: boolean) {
+        this._useLogarithmicDepth = value && this.getScene().getEngine().getCaps().fragmentDepthSupported;
+
+        this._markAllSubMeshesAsMiscDirty();
+    }
+
+    /**
+     * Specifies if the material will require alpha blending
+     * @returns a boolean specifying if alpha blending is needed
+     */
+    public needAlphaBlending(): boolean {
+        if (this._disableAlphaBlending) {
+            return false;
+        }
+
+        return (this.alpha < 1.0) || this._shouldUseAlphaFromDiffuseTexture();
+    }
+
+    /**
+     * Specifies if this material should be rendered in alpha test mode
+     * @returns a boolean specifying if an alpha test is needed.
+     */
+    public needAlphaTesting(): boolean {
+        if (this._forceAlphaTest) {
+            return true;
+        }
+
+        return this._hasAlphaChannel() && (this._transparencyMode == null || this._transparencyMode === Material.MATERIAL_ALPHATEST);
+    }
+
+    /**
+     * Specifies whether or not the alpha value of the diffuse texture should be used for alpha blending.
+     */
+    protected _shouldUseAlphaFromDiffuseTexture(): boolean {
+        return this._diffuseTexture !== null && this._diffuseTexture.hasAlpha && this._useAlphaFromDiffuseTexture && this._transparencyMode !== Material.MATERIAL_OPAQUE;
+    }
+
+    /**
+     * Specifies whether or not there is a usable alpha channel for transparency.
+     */
+    protected _hasAlphaChannel(): boolean {
+        return (this._diffuseTexture !== null && this._diffuseTexture.hasAlpha);
+    }
+
+    /**
+     * Get the texture used for alpha test purpose.
+     * @returns the diffuse texture in case of the standard material.
+     */
+    public getAlphaTestTexture(): Nullable<BaseTexture> {
+        return this._diffuseTexture;
+    }
+
+    /**
+     * Get if the submesh is ready to be used and all its information available.
+     * Child classes can use it to update shaders
+     * @param mesh defines the mesh to check
+     * @param subMesh defines which submesh to check
+     * @param useInstances specifies that instances should be used
+     * @returns a boolean indicating that the submesh is ready or not
      */
     public isReadyForSubMesh(mesh: AbstractMesh, subMesh: SubMesh, useInstances = false): boolean {
         if (subMesh.effect && this.isFrozen) {
@@ -609,7 +672,7 @@ export class MToonMaterial extends PushMaterial {
         }
 
         const scene = this.getScene();
-        const defines = subMesh._materialDefines as MToonMaterialDefines;
+        const defines = <MToonMaterialDefines>subMesh._materialDefines;
         if (this._isReadyForSubMesh(subMesh)) {
             return true;
         }
@@ -621,73 +684,170 @@ export class MToonMaterial extends PushMaterial {
             scene,
             mesh,
             defines,
-            this.specularSupported,
-            this.maxSimultaneousLights,
-            this._disableLighting,
-        );
-
-        if (this.outlineWidthMode !== OutlineWidthMode.None) {
-            // アウトライン描画のためには normal が必要
-            defines._needNormals = true;
-        }
-
-        this.applyDefines(defines);
+            true,
+            this._maxSimultaneousLights,
+            this._disableLighting
+        ) || (this.outlineWidthMode !== OutlineWidthMode.None);
 
         // Multiview
         MaterialHelper.PrepareDefinesForMultiview(scene, defines);
 
+        // PrePass
         MaterialHelper.PrepareDefinesForPrePass(scene, defines, this.canRenderToMRT);
 
         // Textures
-        // defines の変更はシェーダのリコンパイルを必要とするため、必要最小限にする
-        // そのため若干冗長な記述となっている
         if (defines._areTexturesDirty) {
+            this.applyDefines(defines);
+
             defines._needUVs = false;
             defines.MAINUV1 = false;
             defines.MAINUV2 = false;
-
             if (scene.texturesEnabled) {
-                // 追加テクスチャの用意を確認する
-                if (!this.isReadyForTexture(this._diffuseTexture, defines, 'DIFFUSE')
-                    || !this.isReadyForTexture(this._emissiveTexture, defines, 'EMISSIVE')
-                    || !this.isReadyForTexture(this._shadeTexture, defines, 'SHADE')
-                    || !this.isReadyForTexture(this._receiveShadowTexture, defines, 'RECEIVE_SHADOW')
-                    || !this.isReadyForTexture(this._shadingGradeTexture, defines, 'SHADING_GRADE')
-                    || !this.isReadyForTexture(this._rimTexture, defines, 'RIM')
-                    || !this.isReadyForTexture(this._matCapTexture, defines, 'MATCAP')
-                    || !this.isReadyForTexture(this._outlineWidthTexture, defines, 'OUTLINE_WIDTH')
-                    || !this.isReadyForTexture(this._uvAnimationMaskTexture, defines, 'UV_ANIMATION_MASK')
-                ) {
-                    return false;
+                if (this._diffuseTexture) {
+                    if (!this._diffuseTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._diffuseTexture, defines, "DIFFUSE");
+                    }
+                } else {
+                    defines.DIFFUSE = false;
                 }
+
+                if (this._emissiveTexture) {
+                    if (!this._emissiveTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._emissiveTexture, defines, "EMISSIVE");
+                    }
+                } else {
+                    defines.EMISSIVE = false;
+                }
+
+                if (this._specularTexture) {
+                    if (!this._specularTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._specularTexture, defines, "SPECULAR");
+                        defines.GLOSSINESS = this._useGlossinessFromSpecularMapAlpha;
+                    }
+                } else {
+                    defines.SPECULAR = false;
+                }
+
                 if (scene.getEngine().getCaps().standardDerivatives && this._bumpTexture) {
                     // Bump texure can not be not blocking.
                     if (!this._bumpTexture.isReady()) {
                         return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._bumpTexture, defines, "BUMP");
+
+                        defines.PARALLAX = this._useParallax;
+                        defines.PARALLAXOCCLUSION = this._useParallaxOcclusion;
                     }
-                    MaterialHelper.PrepareDefinesForMergedUV(this._bumpTexture, defines, 'BUMP');
+
+                    defines.OBJECTSPACE_NORMALMAP = this._useObjectSpaceNormalMap;
                 } else {
                     defines.BUMP = false;
+                }
+
+                if (this._shadeTexture) {
+                    if (!this._shadeTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._shadeTexture, defines, "SHADE");
+                    }
+                } else {
+                    defines.SHADE = false;
+                }
+
+                if (this._receiveShadowTexture) {
+                    if (!this._receiveShadowTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._receiveShadowTexture, defines, "RECEIVE_SHADOW");
+                    }
+                } else {
+                    defines.RECEIVE_SHADOW = false;
+                }
+
+                if (this._shadingGradeTexture) {
+                    if (!this._shadingGradeTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._shadingGradeTexture, defines, "SHADING_GRADE");
+                    }
+                } else {
+                    defines.SHADING_GRADE = false;
+                }
+
+                if (this._rimTexture) {
+                    if (!this._rimTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._rimTexture, defines, "RIM");
+                    }
+                } else {
+                    defines.RIM = false;
+                }
+
+                if (this._matCapTexture) {
+                    if (!this._matCapTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._matCapTexture, defines, "MATCAP");
+                    }
+                } else {
+                    defines.MATCAP = false;
+                }
+
+                if (this._outlineWidthTexture) {
+                    if (!this._outlineWidthTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._outlineWidthTexture, defines, "OUTLINE_WIDTH");
+                    }
+                } else {
+                    defines.OUTLINE_WIDTH = false;
+                }
+
+                if (this._uvAnimationMaskTexture) {
+                    if (!this._uvAnimationMaskTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._uvAnimationMaskTexture, defines, "UV_ANIMATION_MASK");
+                    }
+                } else {
+                    defines.UV_ANIMATION_MASK = false;
                 }
 
                 defines.TWOSIDEDLIGHTING = !this._backFaceCulling && this._twoSidedLighting;
             } else {
                 defines.DIFFUSE = false;
                 defines.EMISSIVE = false;
+                defines.SPECULAR = false;
+                defines.BUMP = false;
                 defines.SHADE = false;
                 defines.RECEIVE_SHADOW = false;
                 defines.SHADING_GRADE = false;
                 defines.RIM = false;
                 defines.MATCAP = false;
                 defines.OUTLINE_WIDTH = false;
-                defines.BUMP = false;
                 defines.UV_ANIMATION_MASK = false;
             }
+
+            defines.ALPHAFROMDIFFUSE = this._shouldUseAlphaFromDiffuseTexture();
+
+            defines.EMISSIVEASILLUMINATION = this._useEmissiveAsIllumination;
+
+            defines.LINKEMISSIVEWITHDIFFUSE = this._linkEmissiveWithDiffuse;
+
+            defines.SPECULAROVERALPHA = this._useSpecularOverAlpha;
 
             defines.PREMULTIPLYALPHA = (this.alphaMode === Constants.ALPHA_PREMULTIPLIED || this.alphaMode === Constants.ALPHA_PREMULTIPLIED_PORTERDUFF);
 
             defines.ALPHATEST_AFTERALLALPHACOMPUTATIONS = this.transparencyMode !== null;
-            defines.ALPHABLEND = this.transparencyMode === null || this.needAlphaBlendingForMesh(mesh);
+
+            defines.ALPHABLEND = this.transparencyMode === null || this.needAlphaBlendingForMesh(mesh); // check on null for backward compatibility
         }
 
         if (!this.detailMap.isReadyForSubMesh(defines, scene)) {
@@ -702,7 +862,7 @@ export class MToonMaterial extends PushMaterial {
             this.pointsCloud,
             this.fogEnabled,
             this._shouldTurnAlphaTestOn(mesh) || this._forceAlphaTest,
-            defines,
+            defines
         );
 
         // Attribs
@@ -722,7 +882,7 @@ export class MToonMaterial extends PushMaterial {
             defines,
             useInstances,
             null,
-            subMesh.getRenderingMesh().hasThinInstances,
+            subMesh.getRenderingMesh().hasThinInstances
         );
 
         // External config
@@ -735,27 +895,46 @@ export class MToonMaterial extends PushMaterial {
 
             // Fallbacks
             const fallbacks = new EffectFallbacks();
+            if (defines.SPECULAR) {
+                fallbacks.addFallback(0, "SPECULAR");
+            }
 
             if (defines.BUMP) {
-                fallbacks.addFallback(0, 'BUMP');
+                fallbacks.addFallback(0, "BUMP");
+            }
+
+            if (defines.PARALLAX) {
+                fallbacks.addFallback(1, "PARALLAX");
+            }
+
+            if (defines.PARALLAXOCCLUSION) {
+                fallbacks.addFallback(0, "PARALLAXOCCLUSION");
+            }
+
+            if (defines.SPECULAROVERALPHA) {
+                fallbacks.addFallback(0, "SPECULAROVERALPHA");
             }
 
             if (defines.FOG) {
-                fallbacks.addFallback(1, 'FOG');
+                fallbacks.addFallback(1, "FOG");
             }
 
             if (defines.POINTSIZE) {
-                fallbacks.addFallback(0, 'POINTSIZE');
+                fallbacks.addFallback(0, "POINTSIZE");
             }
 
             if (defines.LOGARITHMICDEPTH) {
-                fallbacks.addFallback(0, 'LOGARITHMICDEPTH');
+                fallbacks.addFallback(0, "LOGARITHMICDEPTH");
             }
 
-            MaterialHelper.HandleFallbacksForShadows(defines, fallbacks, this.maxSimultaneousLights);
+            MaterialHelper.HandleFallbacksForShadows(defines, fallbacks, this._maxSimultaneousLights);
+
+            if (defines.SPECULARTERM) {
+                fallbacks.addFallback(0, "SPECULARTERM");
+            }
 
             if (defines.MULTIVIEW) {
-                fallbacks.addFallback(0, 'MULTIVIEW');
+                fallbacks.addFallback(0, "MULTIVIEW");
             }
 
             // Attributes
@@ -763,10 +942,6 @@ export class MToonMaterial extends PushMaterial {
 
             if (defines.NORMAL) {
                 attribs.push(VertexBuffer.NormalKind);
-            }
-
-            if (defines.TANGENT) {
-                attribs.push(VertexBuffer.TangentKind);
             }
 
             if (defines.UV1) {
@@ -777,49 +952,52 @@ export class MToonMaterial extends PushMaterial {
                 attribs.push(VertexBuffer.UV2Kind);
             }
 
+            if (defines.VERTEXCOLOR) {
+                attribs.push(VertexBuffer.ColorKind);
+            }
+
             MaterialHelper.PrepareAttributesForBones(attribs, mesh, defines, fallbacks);
             MaterialHelper.PrepareAttributesForInstances(attribs, defines);
             MaterialHelper.PrepareAttributesForMorphTargets(attribs, mesh, defines);
 
-            const shaderName = 'mtoon';
+            let shaderName = "mtoon";
 
-            const uniforms = [
-                'world', 'view', 'viewProjection', 'vLightsType',
-                'visibility', 'mBones',
-                'vClipPlane', 'vClipPlane2', 'vClipPlane3', 'vClipPlane4', 'vClipPlane5', 'vClipPlane6',
-                'vFogInfos', 'vFogColor', 'pointSize',
-                'alphaCutOff', 'logarithmicDepthConstant', 'vTangentSpaceParams', 'boneTextureWidth',
+            const uniforms = ["world", "view", "viewProjection", "vEyePosition", "vLightsType",
+                "vDiffuseColor", "vSpecularColor", "vEmissiveColor", "visibility",
+                "vFogInfos", "vFogColor", "pointSize",
+                "vDiffuseInfos", "vEmissiveInfos", "vBumpInfos",
+                "mBones",
+                "vClipPlane", "vClipPlane2", "vClipPlane3", "vClipPlane4", "vClipPlane5", "vClipPlane6",
+                "diffuseMatrix", "emissiveMatrix", "bumpMatrix",
+                "logarithmicDepthConstant", "vTangentSpaceParams", "alphaCutOff", "boneTextureWidth",
 
-                'vDiffuseColor', 'vDiffuseInfos', 'diffuseMatrix',
-                'vEmissiveColor', 'vEmissiveInfos', 'emissiveMatrix',
-                'vBumpInfos', 'bumpMatrix',
-                'vShadeColor', 'vShadeInfos', 'shadeMatrix',
-                'vReceiveShadowInfos', 'receiveShadowMatrix',
-                'vShadingGradeInfos', 'shadingGradeMatrix',
-                'vRimColor', 'vRimInfos', 'RimMatrix',
-                'vMatCapInfos', 'MatCapMatrix',
-                'vOutlineColor', 'vOutlineWidthInfos', 'outlineWidthMatrix',
-                'aspect', 'isOutline',
+                "vShadeColor", "vShadeInfos", "shadeMatrix",
+                "vReceiveShadowInfos", "receiveShadowMatrix",
+                "vShadingGradeInfos", "shadingGradeMatrix",
+                "vRimColor", "vRimInfos", "RimMatrix",
+                "vMatCapInfos", "MatCapMatrix",
+                "vOutlineColor", "vOutlineWidthInfos", "outlineWidthMatrix",
+                "aspect", "isOutline",
 
-                'shadingGradeRate', 'receiveShadowRate', 'shadeShift', 'shadeToony',
-                'rimLightingMix', 'rimFresnelPower', 'rimLift',
-                'lightColorAttenuation', 'indirectLightIntensity',
-                'outlineWidth', 'outlineScaledMaxDistance', 'outlineLightingMix',
-                'uvAnimationScrollX', 'uvAnimationScrollY', 'uvAnimationRotation',
+                "shadingGradeRate", "receiveShadowRate", "shadeShift", "shadeToony",
+                "rimLightingMix", "rimFresnelPower", "rimLift",
+                "lightColorAttenuation", "indirectLightIntensity",
+                "outlineWidth", "outlineScaledMaxDistance", "outlineLightingMix",
+                "uvAnimationScrollX", "uvAnimationScrollY", "uvAnimationRotation",
 
-                'vEyePosition', 'vEyeUp', 'time',
+                "vEyeUp", "time",
 
                 "morphTargetTextureInfo", "morphTargetTextureIndices"
             ];
 
-            const samplers = [
-                'diffuseSampler', 'emissiveSampler', 'bumpSampler', 'boneSampler',
-                'shadeSampler', 'receiveShadowSampler', 'shadingGradeSampler',
-                'rimSampler', 'matCapSampler', 'outlineWidthSampler',
-                'uvAnimationMaskSampler', 'morphTargets',
+            const samplers = ["diffuseSampler", "emissiveSampler", "specularSampler", "bumpSampler",
+                "boneSampler",
+                "shadeSampler", "receiveShadowSampler", "shadingGradeSampler",
+                "rimSampler", "matCapSampler", "outlineWidthSampler",
+                "uvAnimationMaskSampler", "morphTargets",
             ];
 
-            const uniformBuffers = ['Material', 'Scene'];
+            const uniformBuffers = ["Material", "Scene"];
 
             DetailMapConfiguration.AddUniforms(uniforms);
             DetailMapConfiguration.AddSamplers(samplers);
@@ -827,37 +1005,39 @@ export class MToonMaterial extends PushMaterial {
             PrePassConfiguration.AddUniforms(uniforms);
             PrePassConfiguration.AddSamplers(samplers);
 
-            MaterialHelper.PrepareUniformsAndSamplersList({
+            MaterialHelper.PrepareUniformsAndSamplersList(<IEffectCreationOptions>{
                 uniformsNames: uniforms,
                 uniformBuffersNames: uniformBuffers,
-                samplers,
-                defines,
-                maxSimultaneousLights: this.maxSimultaneousLights,
-            } as IEffectCreationOptions);
-
-            this.applyDefines(defines);
+                samplers: samplers,
+                defines: defines,
+                maxSimultaneousLights: this._maxSimultaneousLights
+            });
 
             const csnrOptions: ICustomShaderNameResolveOptions = {};
+
+            if (this.customShaderNameResolve) {
+                shaderName = this.customShaderNameResolve(shaderName, uniforms, uniformBuffers, samplers, defines, attribs, csnrOptions);
+            }
 
             const join = defines.toString();
 
             const previousEffect = subMesh.effect;
-            let effect = scene.getEngine().createEffect(shaderName, {
+            let effect = scene.getEngine().createEffect(shaderName, <IEffectCreationOptions>{
                 attributes: attribs,
                 uniformsNames: uniforms,
                 uniformBuffersNames: uniformBuffers,
-                samplers,
+                samplers: samplers,
                 defines: join,
-                fallbacks,
+                fallbacks: fallbacks,
                 onCompiled: this.onCompiled,
                 onError: this.onError,
                 indexParameters: {
-                    maxSimultaneousLights: this.maxSimultaneousLights,
-                    maxSimultaneousMorphTargets: defines.NUM_MORPH_INFLUENCERS,
+                    maxSimultaneousLights: this._maxSimultaneousLights,
+                    maxSimultaneousMorphTargets: defines.NUM_MORPH_INFLUENCERS
                 },
                 processFinalCode: csnrOptions.processFinalCode,
-                multiTarget: defines.PREPASS,
-            } as IEffectCreationOptions, engine);
+                multiTarget: defines.PREPASS
+            }, engine);
 
             if (effect) {
                 if (this._onEffectCreatedObservable) {
@@ -896,15 +1076,96 @@ export class MToonMaterial extends PushMaterial {
     }
 
     /**
-     * @inheritdoc
-     * 現在の値をシェーダにバインドする
-     * このメソッドは毎フレームごとに呼ばれるため、冗長でも高速化を優先する
+     * Builds the material UBO layouts.
+     * Used internally during the effect preparation.
+     */
+    protected buildUniformLayout(): void {
+        // Order is important !
+        const ubo = this._uniformBuffer;
+
+        ubo.addUniform("vDiffuseColor", 4);
+        ubo.addUniform("vDiffuseInfos", 2);
+        ubo.addUniform("diffuseMatrix", 16);
+
+        ubo.addUniform("vSpecularColor", 3);
+        ubo.addUniform("vEmissiveColor", 3);
+        ubo.addUniform("vEmissiveInfos", 2);
+        ubo.addUniform("emissiveMatrix", 16);
+
+        ubo.addUniform("vBumpInfos", 3);
+        ubo.addUniform("bumpMatrix", 16);
+
+        ubo.addUniform("vShadeColor", 3);
+        ubo.addUniform("vShadeInfos", 2);
+        ubo.addUniform("shadeMatrix", 16);
+
+        ubo.addUniform("vReceiveShadowInfos", 2);
+        ubo.addUniform("receiveShadowMatrix", 16);
+
+        ubo.addUniform("vShadingGradeInfos", 2);
+        ubo.addUniform("shadingGradeMatrix", 16);
+
+        ubo.addUniform("vRimColor", 3);
+        ubo.addUniform("vRimInfos", 2);
+        ubo.addUniform("rimMatrix", 16);
+
+        ubo.addUniform("vMatCapInfos", 2);
+        ubo.addUniform("matCapMatrix", 16);
+
+        ubo.addUniform("vOutlineColor", 3);
+        ubo.addUniform("vOutlineWidthInfos", 2);
+        ubo.addUniform("outlineWidthMatrix", 16);
+
+        ubo.addUniform("vUvAnimationMaskInfos", 2);
+        ubo.addUniform("uvAnimationMaskMatrix", 16);
+
+        ubo.addUniform("vTangentSpaceParams", 2);
+        ubo.addUniform("pointSize", 1);
+
+        ubo.addUniform("shadingGradeRate", 1);
+        ubo.addUniform("receiveShadowRate", 1);
+        ubo.addUniform("shadeShift", 1);
+        ubo.addUniform("shadeToony", 1);
+        ubo.addUniform("lightColorAttenuation", 1);
+        ubo.addUniform("indirectLightIntensity", 1);
+        ubo.addUniform("rimLightingMix", 1);
+        ubo.addUniform("rimFresnelPower", 1);
+        ubo.addUniform("rimLift", 1);
+        ubo.addUniform("outlineWidth", 1);
+        ubo.addUniform("outlineScaledMaxDistance", 1);
+        ubo.addUniform("outlineLightingMix", 1);
+        ubo.addUniform("uvAnimationScrollX", 1);
+        ubo.addUniform("uvAnimationScrollY", 1);
+        ubo.addUniform("uvAnimationRotation", 1);
+
+        DetailMapConfiguration.PrepareUniformBuffer(ubo);
+
+        ubo.create();
+    }
+
+    /**
+     * Unbinds the material from the mesh
+     */
+    public unbind(): void {
+        super.unbind();
+    }
+
+    /**
+     * Binds the submesh to this material by preparing the effect and shader to draw
+     * @param world defines the world transformation matrix
+     * @param mesh defines the mesh containing the submesh
+     * @param subMesh defines the submesh to bind the material to
      */
     public bindForSubMesh(world: Matrix, mesh: Mesh, subMesh: SubMesh): void {
         const scene = this.getScene();
-        const defines = subMesh._materialDefines as MToonMaterialDefines;
+
+        const defines = <MToonMaterialDefines>subMesh._materialDefines;
+        if (!defines) {
+            return;
+        }
+
         const effect = subMesh.effect;
-        if (!defines || !effect) {
+        if (!effect) {
             return;
         }
         this._activeEffect = effect;
@@ -923,72 +1184,162 @@ export class MToonMaterial extends PushMaterial {
             this.bindOnlyNormalMatrix(this._normalMatrix);
         }
 
-        const mustRebind = scene.isCachedMaterialInvalid(this, effect, mesh.visibility);
+        // const mustRebind = scene.isCachedMaterialInvalid(this, effect, mesh.visibility);
+        const mustRebind = this._mustRebind(scene, effect, mesh.visibility);
 
+        // Bones
         MaterialHelper.BindBonesParameters(mesh, effect);
         const ubo = this._uniformBuffer;
         if (mustRebind) {
-            ubo.bindToEffect(effect, 'Material');
-            this.bindViewProjection(effect);
+            ubo.bindToEffect(effect, "Material");
 
+            this.bindViewProjection(effect);
             if (!ubo.useUbo || !this.isFrozen || !ubo.isSync) {
+                // Textures
                 if (scene.texturesEnabled) {
-                    this.bindTexture(this._diffuseTexture, effect, 'diffuse', 'vDiffuseInfos');
-                    this.bindTexture(this._emissiveTexture, effect, 'emissive', 'vEmissiveInfos');
-                    if (this._bumpTexture) {
-                        ubo.updateFloat3(
-                            'vBumpInfos',
-                            this._bumpTexture.coordinatesIndex,
-                            1.0 / this._bumpTexture.level,
-                            this._bumpScale,
-                        );
-                        const matrix = this._bumpTexture.getTextureMatrix();
-                        if (!matrix.isIdentityAs3x2()) {
-                            ubo.updateMatrix(`bumpMatrix`, matrix);
-                        }
-                        effect.setTexture(`bumpSampler`, this._bumpTexture);
-                        // bumpTexture は babylon.js のデフォルトと反対の状態である
+                    if (this._diffuseTexture) {
+                        ubo.updateFloat2("vDiffuseInfos", this._diffuseTexture.coordinatesIndex, this._diffuseTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._diffuseTexture, ubo, "diffuse");
+                    }
+
+                    if (this._hasAlphaChannel()) {
+                        effect.setFloat("alphaCutOff", this.alphaCutOff);
+                    }
+
+                    if (this._emissiveTexture) {
+                        ubo.updateFloat2("vEmissiveInfos", this._emissiveTexture.coordinatesIndex, this._emissiveTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._emissiveTexture, ubo, "emissive");
+                    }
+
+                    if (this._specularTexture) {
+                        ubo.updateFloat2("vSpecularInfos", this._specularTexture.coordinatesIndex, this._specularTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._specularTexture, ubo, "specular");
+                    }
+
+                    if (this._bumpTexture && scene.getEngine().getCaps().standardDerivatives) {
+                        ubo.updateFloat3("vBumpInfos", this._bumpTexture.coordinatesIndex, 1.0 / this._bumpTexture.level, this.parallaxScaleBias);
+                        MaterialHelper.BindTextureMatrix(this._bumpTexture, ubo, "bump");
+
                         if (scene._mirroredCameraPosition) {
-                            ubo.updateFloat2('vTangentSpaceParams', 1.0, 1.0);
+                            ubo.updateFloat2("vTangentSpaceParams", -1.0, -1.0);
                         } else {
-                            ubo.updateFloat2('vTangentSpaceParams', -1.0, -1.0);
+                            ubo.updateFloat2("vTangentSpaceParams", 1.0, 1.0);
                         }
                     }
-                    this.bindTexture(this._shadeTexture, effect, 'shade', 'vShadeInfos');
-                    this.bindTexture(this._receiveShadowTexture, effect, 'receiveShadow', 'vReceiveShadowInfos');
-                    this.bindTexture(this._shadingGradeTexture, effect, 'shadingGrade', 'vShadingGradeInfos');
-                    this.bindTexture(this._rimTexture, effect, 'rim', 'vRimInfos');
-                    this.bindTexture(this._matCapTexture, effect, 'matCap', 'vMatCapInfos');
-                    this.bindTexture(this._outlineWidthTexture, effect, 'outlineWidth', 'vOutlineWidthInfos');
-                    this.bindTexture(this._uvAnimationMaskTexture, effect, 'uvAnimationMask', 'vUvAnimationMaskInfos');
-                }
 
-                if (this._hasAlphaChannel()) {
-                    effect.setFloat('alphaCutOff', this.alphaCutOff);
+                    if (this._shadeTexture) {
+                        ubo.updateFloat2("vShadeInfos", this._shadeTexture.coordinatesIndex, this._shadeTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._shadeTexture, ubo, "shade");
+                    }
+
+                    if (this._receiveShadowTexture) {
+                        ubo.updateFloat2("vReceiveShadowInfos", this._receiveShadowTexture.coordinatesIndex, this._receiveShadowTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._receiveShadowTexture, ubo, "receiveShadow");
+                    }
+
+                    if (this._shadingGradeTexture) {
+                        ubo.updateFloat2("vShadingGradeInfos", this._shadingGradeTexture.coordinatesIndex, this._shadingGradeTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._shadingGradeTexture, ubo, "shadingGrade");
+                    }
+
+                    if (this._rimTexture) {
+                        ubo.updateFloat2("vRimInfos", this._rimTexture.coordinatesIndex, this._rimTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._rimTexture, ubo, "rim");
+                    }
+
+                    if (this._matCapTexture) {
+                        ubo.updateFloat2("vMatCapInfos", this._matCapTexture.coordinatesIndex, this._matCapTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._matCapTexture, ubo, "matCap");
+                    }
+
+                    if (this._outlineWidthTexture) {
+                        ubo.updateFloat2("vOutlineWidthInfos", this._outlineWidthTexture.coordinatesIndex, this._outlineWidthTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._outlineWidthTexture, ubo, "outlineWidth");
+                    }
+
+                    if (this._uvAnimationMaskTexture) {
+                        ubo.updateFloat2("vUvAnimationMaskInfos", this._uvAnimationMaskTexture.coordinatesIndex, this._uvAnimationMaskTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._uvAnimationMaskTexture, ubo, "uvAnimationMask");
+                    }
                 }
             }
 
             // Point size
             if (this.pointsCloud) {
-                ubo.updateFloat('pointSize', this.pointSize);
+                ubo.updateFloat("pointSize", this.pointSize);
             }
 
+            if (defines.SPECULARTERM) {
+                ubo.updateColor4("vSpecularColor", this.specularColor, this.specularPower);
+            }
+            ubo.updateColor3("vEmissiveColor", this.emissiveColor);
+
+            // Diffuse
+            ubo.updateColor4("vDiffuseColor", this.diffuseColor, this.alpha);
+
             // MToon uniforms
-            ubo.updateFloat('receiveShadowRate', this._receiveShadowRate);
-            ubo.updateFloat('shadingGradeRate', this._shadingGradeRate);
-            ubo.updateFloat('shadeShift', this._shadeShift);
-            ubo.updateFloat('shadeToony', this._shadeToony);
-            ubo.updateFloat('lightColorAttenuation', this._lightColorAttenuation);
-            ubo.updateFloat('indirectLightIntensity', this._indirectLightIntensity);
-            ubo.updateFloat('rimLightingMix', this._rimLightingMix);
-            ubo.updateFloat('rimFresnelPower', this._rimFresnelPower);
-            ubo.updateFloat('rimLift', this._rimLift);
-            ubo.updateFloat('outlineWidth', this._outlineWidth);
-            ubo.updateFloat('outlineScaledMaxDistance', this._outlineScaledMaxDistance);
-            ubo.updateFloat('outlineLightingMix', this._outlineLightingMix);
-            ubo.updateFloat('uvAnimationScrollX', this._uvAnimationScrollX);
-            ubo.updateFloat('uvAnimationScrollY', this._uvAnimationScrollY);
-            ubo.updateFloat('uvAnimationRotation', this._uvAnimationRotation);
+            ubo.updateFloat("receiveShadowRate", this._receiveShadowRate);
+            ubo.updateFloat("shadingGradeRate", this._shadingGradeRate);
+            ubo.updateFloat("shadeShift", this._shadeShift);
+            ubo.updateFloat("shadeToony", this._shadeToony);
+            ubo.updateFloat("lightColorAttenuation", this._lightColorAttenuation);
+            ubo.updateFloat("indirectLightIntensity", this._indirectLightIntensity);
+            ubo.updateFloat("rimLightingMix", this._rimLightingMix);
+            ubo.updateFloat("rimFresnelPower", this._rimFresnelPower);
+            ubo.updateFloat("rimLift", this._rimLift);
+            ubo.updateFloat("outlineWidth", this._outlineWidth);
+            ubo.updateFloat("outlineScaledMaxDistance", this._outlineScaledMaxDistance);
+            ubo.updateFloat("outlineLightingMix", this._outlineLightingMix);
+            ubo.updateFloat("uvAnimationScrollX", this._uvAnimationScrollX);
+            ubo.updateFloat("uvAnimationScrollY", this._uvAnimationScrollY);
+            ubo.updateFloat("uvAnimationRotation", this._uvAnimationRotation);
+
+            // Textures
+            if (scene.texturesEnabled) {
+                if (this._diffuseTexture) {
+                    effect.setTexture("diffuseSampler", this._diffuseTexture);
+                }
+
+                if (this._emissiveTexture) {
+                    effect.setTexture("emissiveSampler", this._emissiveTexture);
+                }
+
+                if (this._specularTexture) {
+                    effect.setTexture("specularSampler", this._specularTexture);
+                }
+
+                if (this._bumpTexture && scene.getEngine().getCaps().standardDerivatives) {
+                    effect.setTexture("bumpSampler", this._bumpTexture);
+                }
+
+                if (this._shadeTexture) {
+                    effect.setTexture("shadeSampler", this._shadeTexture);
+                }
+
+                if (this._receiveShadowTexture) {
+                    effect.setTexture("receiveShadowSampler", this._receiveShadowTexture);
+                }
+
+                if (this._shadingGradeTexture) {
+                    effect.setTexture("shadingGradeSampler", this._shadingGradeTexture);
+                }
+
+                if (this._rimTexture) {
+                    effect.setTexture("rimSampler", this._rimTexture);
+                }
+
+                if (this._matCapTexture) {
+                    effect.setTexture("matCapSampler", this._matCapTexture);
+                }
+
+                if (this._outlineWidthTexture) {
+                    effect.setTexture("outlineWidthSampler", this._outlineWidthTexture);
+                }
+
+                if (this._uvAnimationMaskTexture) {
+                    effect.setTexture("uvAnimationMaskSampler", this._uvAnimationMaskTexture);
+                }
+            }
 
             this.detailMap.bindForSubMesh(ubo, scene, this.isFrozen);
 
@@ -996,22 +1347,20 @@ export class MToonMaterial extends PushMaterial {
             MaterialHelper.BindClipPlane(effect, scene);
 
             // Colors
-            scene.ambientColor.multiplyToRef(this.ambientColor, this.globalAmbientColor);
-            effect.setColor3('vAmbientColor', this.globalAmbientColor);
-            ubo.updateColor4('vDiffuseColor', this.diffuseColor, this.alpha);
-            ubo.updateColor3('vEmissiveColor', this.emissiveColor);
-            ubo.updateColor3('vShadeColor', this.shadeColor);
-            ubo.updateColor3('vRimColor', this.rimColor);
-            ubo.updateColor4('vOutlineColor', this.outlineColor, 1.0);
+            scene.ambientColor.multiplyToRef(this.ambientColor, this._globalAmbientColor);
 
-            MaterialHelper.BindEyePosition(effect, scene);
-            effect.setVector3('vEyeUp', scene.activeCamera!.upVector);
+            scene.bindEyePosition(effect);
+            effect.setColor3("vAmbientColor", this._globalAmbientColor);
+            effect.setVector3("vEyeUp", scene.activeCamera!.upVector);
+            ubo.updateColor3("vShadeColor", this.shadeColor);
+            ubo.updateColor3("vRimColor", this.rimColor);
+            ubo.updateColor4("vOutlineColor", this.outlineColor, 1.0);
         }
 
         if (mustRebind || !this.isFrozen) {
-            // `freeze` しない限り毎回更新される値
-            if (scene.lightsEnabled && !this.disableLighting) {
-                MaterialHelper.BindLights(scene, mesh, effect, defines, this.maxSimultaneousLights, this._rebuildInParallel);
+            // Lights
+            if (scene.lightsEnabled && !this._disableLighting) {
+                MaterialHelper.BindLights(scene, mesh, effect, defines, this._maxSimultaneousLights);
             }
 
             // View
@@ -1032,26 +1381,28 @@ export class MToonMaterial extends PushMaterial {
                 MaterialHelper.BindLogDepth(defines, effect, scene);
             }
         }
-        effect.setFloat('aspect', scene.getEngine().getAspectRatio(scene.activeCamera!));
-        effect.setFloat('isOutline', 0.0);
+        effect.setFloat("aspect", scene.getEngine().getAspectRatio(scene.activeCamera!));
+        effect.setFloat("isOutline", 0);
         const t = window.performance.now() / 1000;
-        effect.setVector4('time', new Vector4(
+        effect.setVector4("time", new Vector4(
             t / 20,
             t,
             t * 2,
             t * 3,
         ));
 
-        this._afterBind(mesh, this._activeEffect);
         ubo.update();
+        this._afterBind(mesh, this._activeEffect);
     }
 
     /**
-     * @inheritdoc
+     * Get the list of animatables in the material.
+     * @returns the list of animatables object used in the material
      */
     public getAnimatables(): IAnimatable[] {
         const results: IAnimatable[] = [];
-        for (const texture of this.appendedActiveTextures) {
+
+        for (const texture of this.appendedActiveTextures()) {
             if (texture.animations && texture.animations.length > 0) {
                 results.push(texture);
             }
@@ -1063,10 +1414,11 @@ export class MToonMaterial extends PushMaterial {
     }
 
     /**
-     * @inheritdoc
+     * Gets the active textures from the material
+     * @returns an array of textures
      */
     public getActiveTextures(): BaseTexture[] {
-        const activeTextures = super.getActiveTextures().concat(this.appendedActiveTextures);
+        const activeTextures = super.getActiveTextures().concat(this.appendedActiveTextures());
 
         this.detailMap.getActiveTextures(activeTextures);
 
@@ -1074,145 +1426,38 @@ export class MToonMaterial extends PushMaterial {
     }
 
     /**
-     * @inheritdoc
+     * Specifies if the material uses a texture
+     * @param texture defines the texture to check against the material
+     * @returns a boolean specifying if the material uses the texture
      */
     public hasTexture(texture: BaseTexture): boolean {
         if (super.hasTexture(texture)) {
             return true;
-        } else if (this.appendedActiveTextures.length > 0) {
-            for (const tex of this.appendedActiveTextures) {
-                if (tex === texture) {
-                    return true;
-                }
-            }
         }
-        return this.detailMap.hasTexture(texture);
+
+        const activeTextures = this.appendedActiveTextures();
+        return activeTextures.length > 0 ?
+            activeTextures.some((e) => e === texture)
+            : this.detailMap.hasTexture(texture);
     }
 
     /**
-     * @inheritdoc
+     * Disposes the material
+     * @param forceDisposeEffect specifies if effects should be forcefully disposed
+     * @param forceDisposeTextures specifies if textures should be forcefully disposed
      */
     public dispose(
         forceDisposeEffect?: boolean,
         forceDisposeTextures?: boolean,
         notBoundToMesh?: boolean,
     ): void {
-        delete this.outlineRenderer;
         if (forceDisposeTextures) {
-            for (const texture of this.appendedActiveTextures) {
-                texture.dispose();
-            }
+            this.appendedActiveTextures().forEach((e) => e.dispose());
         }
 
         this.detailMap.dispose(forceDisposeTextures);
 
-        super.dispose(forceDisposeEffect, forceDisposeTextures, notBoundToMesh);
-    }
-
-    /**
-     * UniformBufferObject のレイアウトを決定する
-     * シェーダー内の `uniform Material` と同じ順序で add する必要がある
-     * UBO を利用すると効率的に変数をシェーダに渡せるが、 WebGL v2 のみ対応
-     * babylon.js では WebGL v1 の場合自動でフォールバックしてくれる
-     * 第二引数は float の数
-     */
-    protected buildUniformLayout(): void {
-        const ubo = this._uniformBuffer;
-
-        ubo.addUniform('vDiffuseColor', 4);
-        ubo.addUniform('vDiffuseInfos', 2);
-        ubo.addUniform('diffuseMatrix', 16);
-
-        ubo.addUniform('vEmissiveColor', 3);
-        ubo.addUniform('vEmissiveInfos', 2);
-        ubo.addUniform('emissiveMatrix', 16);
-
-        ubo.addUniform('vBumpInfos', 3);
-        ubo.addUniform('bumpMatrix', 16);
-
-        ubo.addUniform('vShadeColor', 3);
-        ubo.addUniform('vShadeInfos', 2);
-        ubo.addUniform('shadeMatrix', 16);
-
-        ubo.addUniform('vReceiveShadowInfos', 2);
-        ubo.addUniform('receiveShadowMatrix', 16);
-
-        ubo.addUniform('vShadingGradeInfos', 2);
-        ubo.addUniform('shadingGradeMatrix', 16);
-
-        ubo.addUniform('vRimColor', 3);
-        ubo.addUniform('vRimInfos', 2);
-        ubo.addUniform('rimMatrix', 16);
-
-        ubo.addUniform('vMatCapInfos', 2);
-        ubo.addUniform('matCapMatrix', 16);
-
-        ubo.addUniform('vOutlineColor', 3);
-        ubo.addUniform('vOutlineWidthInfos', 2);
-        ubo.addUniform('outlineWidthMatrix', 16);
-
-        ubo.addUniform('vUvAnimationMaskInfos', 2);
-        ubo.addUniform('uvAnimationMaskMatrix', 16);
-
-        ubo.addUniform('vTangentSpaceParams', 2);
-        ubo.addUniform('pointSize', 1);
-
-        ubo.addUniform('shadingGradeRate', 1);
-        ubo.addUniform('receiveShadowRate', 1);
-        ubo.addUniform('shadeShift', 1);
-        ubo.addUniform('shadeToony', 1);
-        ubo.addUniform('lightColorAttenuation', 1);
-        ubo.addUniform('indirectLightIntensity', 1);
-        ubo.addUniform('rimLightingMix', 1);
-        ubo.addUniform('rimFresnelPower', 1);
-        ubo.addUniform('rimLift', 1);
-        ubo.addUniform('outlineWidth', 1);
-        ubo.addUniform('outlineScaledMaxDistance', 1);
-        ubo.addUniform('outlineLightingMix', 1);
-        ubo.addUniform('uvAnimationScrollX', 1);
-        ubo.addUniform('uvAnimationScrollY', 1);
-        ubo.addUniform('uvAnimationRotation', 1);
-
-        DetailMapConfiguration.PrepareUniformBuffer(ubo);
-
-        ubo.create();
-    }
-
-    /**
-     * テクスチャ情報をバインドする
-     * @param texture
-     * @param effect
-     * @param name
-     * @param infoName
-     */
-    private bindTexture(texture: Nullable<BaseTexture>, effect: Effect, name: string, infoName: string) {
-        if (!texture) {
-            return;
-        }
-        this._uniformBuffer.updateFloat2(infoName, texture.coordinatesIndex, texture.level);
-        const matrix = texture.getTextureMatrix();
-        if (!matrix.isIdentityAs3x2()) {
-            this._uniformBuffer.updateMatrix(`${name}Matrix`, matrix);
-        }
-        effect.setTexture(`${name}Sampler`, texture);
-    }
-
-    /**
-     * テクスチャの用意が終わっているか確認する
-     * @param texture
-     * @param defines
-     * @param key
-     */
-    private isReadyForTexture(texture: Nullable<BaseTexture>, defines: any, key: string): boolean {
-        if (!texture) {
-            defines[key] = false;
-            return true;
-        }
-        if (!texture.isReadyOrNotBlocking()) {
-            return false;
-        }
-        MaterialHelper.PrepareDefinesForMergedUV(texture, defines, key);
-        return true;
+        super.dispose(forceDisposeEffect, forceDisposeTextures);
     }
 
     /**
@@ -1245,7 +1490,7 @@ export class MToonMaterial extends PushMaterial {
                 }
                 break;
         }
-        switch (this.outlineWidthMode) {
+        switch (this._outlineWidthMode) {
             case OutlineWidthMode.WorldCorrdinates:
                 if (defines.MTOON_OUTLINE_WIDTH_WORLD !== true) {
                     defines.MTOON_OUTLINE_WIDTH_WORLD = true;
@@ -1268,7 +1513,7 @@ export class MToonMaterial extends PushMaterial {
                 }
                 break;
         }
-        switch (this.outlineColorMode) {
+        switch (this._outlineColorMode) {
             case OutlineColorMode.FixedColor:
                 if (defines.MTOON_OUTLINE_COLOR_FIXED !== true) {
                     defines.MTOON_OUTLINE_COLOR_FIXED = true;
@@ -1288,59 +1533,9 @@ export class MToonMaterial extends PushMaterial {
 
 //#region Misc
     /**
-     * @inheritdoc
-     */
-    public getClassName() {
-        return 'MToonMaterial';
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public needAlphaBlending() {
-        if (this._disableAlphaBlending) {
-            return false;
-        }
-        return this._alphaBlend || (this.alpha < 1.0) || this._shouldUseAlphaFromDiffuseTexture();
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public needAlphaTesting() {
-        if (this._forceAlphaTest) {
-            return true;
-        }
-        return this._alphaTest
-            || (this._hasAlphaChannel() && (this._transparencyMode == null || this._transparencyMode === Material.MATERIAL_ALPHATEST));
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected _shouldUseAlphaFromDiffuseTexture(): boolean {
-        return this._diffuseTexture != null
-            && this._diffuseTexture.hasAlpha
-            && this._useAlphaFromDiffuseTexture
-            && this._transparencyMode !== Material.MATERIAL_OPAQUE;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected _hasAlphaChannel(): boolean {
-        return (this._diffuseTexture !== null && this._diffuseTexture.hasAlpha); // || this._opacityTexture != null;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public getAlphaTestTexture(): Nullable<BaseTexture> {
-        return this.diffuseTexture;
-    }
-
-    /**
-     * @inheritdoc
+     * Makes a duplicate of the material, and gives it a new name
+     * @param name defines the new name for the duplicated material
+     * @returns the cloned material
      */
     public clone(name: string): MToonMaterial {
         const result = SerializationHelper.Clone(() => new MToonMaterial(name, this.getScene()), this);
@@ -1352,17 +1547,24 @@ export class MToonMaterial extends PushMaterial {
     }
 
     /**
-     * @inheritdoc
+     * Serializes this material in a JSON representation
+     * @returns the serialized material object
      */
     public serialize(): any {
         return SerializationHelper.Serialize(this);
     }
 
     /**
-     * @inheritdoc
+     * Creates a standard material from parsed material data
+     * @param source defines the JSON representation of the material
+     * @param scene defines the hosting scene
+     * @param rootUrl defines the root URL to use to load textures and relative dependencies
+     * @returns a new standard material
      */
-    public static Parse(parsedMaterial: any, scene: Scene, rootUrl: string): MToonMaterial {
-        return SerializationHelper.Parse(() => new MToonMaterial(parsedMaterial.name, scene), parsedMaterial, scene, rootUrl);
+    public static Parse(source: any, scene: Scene, rootUrl: string): MToonMaterial {
+        return SerializationHelper.Parse(() => new MToonMaterial(source.name, scene), source, scene, rootUrl);
     }
 //#endregion
 }
+
+_TypeStore.RegisteredTypes["BABYLON.MToonMaterial"] = MToonMaterial;

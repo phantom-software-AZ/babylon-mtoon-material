@@ -13,7 +13,7 @@ vec2 uvOffset = vec2(0.0, 0.0);
     #if defined(TANGENT) && defined(NORMAL)
         mat3 TBN = vTBN;
     #elif defined(BUMP)
-        mat3 TBN = cotangent_frame(normalW * normalScale, vPositionW, mainUv);
+        mat3 TBN = cotangent_frame(normalW * normalScale, vPositionW, mainUv, vTangentSpaceParams);
     #else
         mat3 TBN = cotangent_frame(normalW * normalScale, vPositionW, vDetailUV, vec2(1., 1.));
     #endif
@@ -47,7 +47,7 @@ vec2 uvOffset = vec2(0.0, 0.0);
         normalW = normalize(texture2D(bumpSampler, mainUv).xyz  * 2.0 - 1.0);
         normalW = normalize(mat3(normalMatrix) * normalW);
     #elif !defined(DETAIL)
-        normalW = perturbNormal(TBN, mainUv + uvOffset);
+        normalW = perturbNormal(TBN, texture2D(bumpSampler, vBumpUV + uvOffset).xyz, vBumpInfos.y);
     #else
         vec3 bumpNormal = texture2D(bumpSampler, mainUv + uvOffset).xyz * 2.0 - 1.0;
         // Reference for normal blending: https://blog.selfshadow.com/publications/blending-in-detail/

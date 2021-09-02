@@ -44,7 +44,7 @@ export class MToonMaterialDefines extends MaterialDefines {
     // public REFLECTION = false;
     public EMISSIVE = false;
     public EMISSIVEDIRECTUV = 0;
-    // public SPECULAR = false;
+    public SPECULAR = false;
     // public SPECULARDIRECTUV = 0;
     public BUMP = false;
     public BUMPDIRECTUV = 0;
@@ -62,8 +62,7 @@ export class MToonMaterialDefines extends MaterialDefines {
     public ALPHAFROMDIFFUSE = false;
     public POINTSIZE = false;
     public FOG = false;
-    public MULTIVIEW = false;
-    // public SPECULARTERM = false;
+    public SPECULARTERM = false;
     // public DIFFUSEFRESNEL = false;
     // public OPACITYFRESNEL = false;
     // public REFLECTIONFRESNEL = false;
@@ -83,8 +82,8 @@ export class MToonMaterialDefines extends MaterialDefines {
     public THIN_INSTANCES = false;
     // public GLOSSINESS = false;
     // public ROUGHNESS = false;
-    // public EMISSIVEASILLUMINATION = false;
-    // public LINKEMISSIVEWITHDIFFUSE = false;
+    public EMISSIVEASILLUMINATION = false;
+    public LINKEMISSIVEWITHDIFFUSE = false;
     // public REFLECTIONFRESNELFROMSPECULAR = false;
     // public LIGHTMAP = false;
     // public LIGHTMAPDIRECTUV = 0;
@@ -95,14 +94,12 @@ export class MToonMaterialDefines extends MaterialDefines {
     // public REFLECTIONMAP_PLANAR = false;
     // public REFLECTIONMAP_CUBIC = false;
     // public USE_LOCAL_REFLECTIONMAP_CUBIC = false;
-    // public USE_LOCAL_REFRACTIONMAP_CUBIC = false;
     // public REFLECTIONMAP_PROJECTION = false;
     // public REFLECTIONMAP_SKYBOX = false;
     // public REFLECTIONMAP_EXPLICIT = false;
     // public REFLECTIONMAP_EQUIRECTANGULAR = false;
     // public REFLECTIONMAP_EQUIRECTANGULAR_FIXED = false;
     // public REFLECTIONMAP_MIRROREDEQUIRECTANGULAR_FIXED = false;
-    // public REFLECTIONMAP_OPPOSITEZ = false;
     // public INVERTCUBICMAP = false;
     public LOGARITHMICDEPTH = false;
     // public REFRACTION = false;
@@ -115,7 +112,6 @@ export class MToonMaterialDefines extends MaterialDefines {
     public MORPHTARGETS_TANGENT = false;
     public MORPHTARGETS_UV = false;
     public NUM_MORPH_INFLUENCERS = 0;
-    public MORPHTARGETS_TEXTURE = false;
     public NONUNIFORMSCALING = false; // https://playground.babylonjs.com#V6DWIH
     public PREMULTIPLYALPHA = false; // https://playground.babylonjs.com#LNVJJ7
     public ALPHATEST_AFTERALLALPHACOMPUTATIONS = false;
@@ -126,10 +122,8 @@ export class MToonMaterialDefines extends MaterialDefines {
     // public PREPASS_IRRADIANCE_INDEX = -1;
     // public PREPASS_ALBEDO = false;
     // public PREPASS_ALBEDO_INDEX = -1;
-    // public PREPASS_DEPTH = false;
-    // public PREPASS_DEPTH_INDEX = -1;
-    // public PREPASS_NORMAL = false;
-    // public PREPASS_NORMAL_INDEX = -1;
+    // public PREPASS_DEPTHNORMAL = false;
+    // public PREPASS_DEPTHNORMAL_INDEX = -1;
     // public PREPASS_POSITION = false;
     // public PREPASS_POSITION_INDEX = -1;
     // public PREPASS_VELOCITY = false;
@@ -155,23 +149,20 @@ export class MToonMaterialDefines extends MaterialDefines {
     // public SAMPLER3DGREENDEPTH = false;
     // public SAMPLER3DBGRMAP = false;
     // public IMAGEPROCESSINGPOSTPROCESS = false;
-    // public MULTIVIEW = false;
-    // /**
-    //  * If the reflection texture on this material is in linear color space
-    //  * @hidden
-    //  */
+    public MULTIVIEW = false;
+    /**
+     * If the reflection texture on this material is in linear color space
+     * @hidden
+     */
     // public IS_REFLECTION_LINEAR = false;
-    // /**
-    //  * If the refraction texture on this material is in linear color space
-    //  * @hidden
-    //  */
+    /**
+     * If the refraction texture on this material is in linear color space
+     * @hidden
+     */
     // public IS_REFRACTION_LINEAR = false;
     // public EXPOSURE = false;
 
-    /**
-     * @inheritdoc
-     */
-    public constructor() {
+    constructor() {
         super();
         this.rebuild();
     }

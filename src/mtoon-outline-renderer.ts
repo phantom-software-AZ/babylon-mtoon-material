@@ -88,7 +88,8 @@ export class MToonOutlineRenderer implements ISceneComponent {
         const renderingMesh = subMesh.getRenderingMesh();
         const effectiveMesh = replacementMesh ? replacementMesh : renderingMesh;
 
-        this.material.applyOutlineCullMode();
+        const storedCullMode = this.material.cullMode;
+        this.material.cullMode = this.material.outlineCullMode;
         this._engine.enableEffect(effect);
         renderingMesh._bind(subMesh, effect, this.material.fillMode);
 
@@ -129,7 +130,7 @@ export class MToonOutlineRenderer implements ISceneComponent {
         }
 
         this._engine.setZOffset(0);
-        this.material.restoreOutlineCullMode();
+        this.material.cullMode = storedCullMode;
     }
 
     /**

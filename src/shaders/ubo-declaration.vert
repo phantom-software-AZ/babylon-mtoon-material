@@ -9,6 +9,7 @@ uniform Material
     vec4 vDiffuseColor;
     vec2 vDiffuseInfos;
     mat4 diffuseMatrix;
+    vec3 vSpecularColor;
     vec4 vEmissiveColor;
     vec2 vEmissiveInfos;
     mat4 emissiveMatrix;

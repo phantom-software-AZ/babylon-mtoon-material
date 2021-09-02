@@ -9,7 +9,7 @@ import { Texture } from '@babylonjs/core/Materials/Textures/texture';
 import { Color3, Vector3 } from '@babylonjs/core/Maths/math';
 import { SphereBuilder } from '@babylonjs/core/Meshes/Builders/sphereBuilder';
 import { TorusKnotBuilder } from '@babylonjs/core/Meshes/Builders/torusKnotBuilder';
-import { VertexBuffer } from '@babylonjs/core/Meshes/buffer';
+import { VertexBuffer } from '@babylonjs/core/Buffers/buffer';
 import { Scene } from '@babylonjs/core/scene';
 import { MToonMaterial } from '../mtoon-material';
 
@@ -95,7 +95,7 @@ async function main() {
         mat.diffuseTexture = new Texture('https://upload.wikimedia.org/wikipedia/commons/8/87/Alaskan_Malamute%2BBlank.png', scene);
         mat.diffuseTexture.hasAlpha = true;
         mat.shadeTexture = mat.diffuseTexture.clone();
-        mat.alphaBlend = true;
+        mat.transparencyMode = Material.MATERIAL_ALPHATESTANDBLEND;
         mtoonMaterials.push(mat);
     }
     {
@@ -105,7 +105,7 @@ async function main() {
         mat.diffuseTexture = new Texture('https://upload.wikimedia.org/wikipedia/commons/8/87/Alaskan_Malamute%2BBlank.png', scene);
         mat.diffuseTexture.hasAlpha = true;
         mat.shadeTexture = mat.diffuseTexture.clone();
-        mat.alphaTest = true;
+        mat.transparencyMode = Material.MATERIAL_ALPHATESTANDBLEND;
         mat.alphaCutOff = 0.500;
         mtoonMaterials.push(mat);
     }
