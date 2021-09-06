@@ -9,8 +9,13 @@ uniform Material
     vec4 vDiffuseColor;
     vec2 vDiffuseInfos;
     mat4 diffuseMatrix;
-    vec3 vSpecularColor;
-    vec4 vEmissiveColor;
+    vec4 vSpecularColor;
+    vec2 vSpecularInfos;
+    mat4 specularMatrix;
+    vec3 vAmbientColor;
+    vec2 vAmbientInfos;
+    mat4 ambientMatrix;
+    vec3 vEmissiveColor;
     vec2 vEmissiveInfos;
     mat4 emissiveMatrix;
     vec3 vBumpInfos;
@@ -36,6 +41,7 @@ uniform Material
     // babylon specific
     vec2 vTangentSpaceParams;
     float pointSize;
+    float alphaCutOff;
 
     // MToon params
     float shadingGradeRate;
@@ -62,4 +68,6 @@ uniform Scene {
     mat4 viewProjectionR;
 #endif
     mat4 view;
+    mat4 projection;
+    vec4 vEyePosition;
 };

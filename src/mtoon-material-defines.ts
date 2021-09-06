@@ -31,13 +31,17 @@ export class MToonMaterialDefines extends MaterialDefines {
     // Misc
     public MAINUV1 = false;
     public MAINUV2 = false;
+    public MAINUV3 = false;
+    public MAINUV4 = false;
+    public MAINUV5 = false;
+    public MAINUV6 = false;
     public DIFFUSE = false;
     public DIFFUSEDIRECTUV = 0;
     public DETAIL = false;
     public DETAILDIRECTUV = 0;
     public DETAIL_NORMALBLENDMETHOD = 0;
-    // public AMBIENT = false;
-    // public AMBIENTDIRECTUV = 0;
+    public AMBIENT = false;
+    public AMBIENTDIRECTUV = 0;
     // public OPACITY = false;
     // public OPACITYDIRECTUV = 0;
     // public OPACITYRGB = false;
@@ -70,8 +74,13 @@ export class MToonMaterialDefines extends MaterialDefines {
     // public EMISSIVEFRESNEL = false;
     // public FRESNEL = false;
     public NORMAL = false;
+    public TANGENT = false;
     public UV1 = false;
     public UV2 = false;
+    public UV3 = false;
+    public UV4 = false;
+    public UV5 = false;
+    public UV6 = false;
     public VERTEXCOLOR = false;
     public VERTEXALPHA = false;
     public NUM_BONE_INFLUENCERS = 0;
@@ -94,12 +103,14 @@ export class MToonMaterialDefines extends MaterialDefines {
     // public REFLECTIONMAP_PLANAR = false;
     // public REFLECTIONMAP_CUBIC = false;
     // public USE_LOCAL_REFLECTIONMAP_CUBIC = false;
+    // public USE_LOCAL_REFRACTIONMAP_CUBIC = false;
     // public REFLECTIONMAP_PROJECTION = false;
     // public REFLECTIONMAP_SKYBOX = false;
     // public REFLECTIONMAP_EXPLICIT = false;
     // public REFLECTIONMAP_EQUIRECTANGULAR = false;
     // public REFLECTIONMAP_EQUIRECTANGULAR_FIXED = false;
     // public REFLECTIONMAP_MIRROREDEQUIRECTANGULAR_FIXED = false;
+    // public REFLECTIONMAP_OPPOSITEZ = false;
     // public INVERTCUBICMAP = false;
     public LOGARITHMICDEPTH = false;
     // public REFRACTION = false;
@@ -112,6 +123,7 @@ export class MToonMaterialDefines extends MaterialDefines {
     public MORPHTARGETS_TANGENT = false;
     public MORPHTARGETS_UV = false;
     public NUM_MORPH_INFLUENCERS = 0;
+    public MORPHTARGETS_TEXTURE = false;
     public NONUNIFORMSCALING = false; // https://playground.babylonjs.com#V6DWIH
     public PREMULTIPLYALPHA = false; // https://playground.babylonjs.com#LNVJJ7
     public ALPHATEST_AFTERALLALPHACOMPUTATIONS = false;
@@ -122,8 +134,10 @@ export class MToonMaterialDefines extends MaterialDefines {
     // public PREPASS_IRRADIANCE_INDEX = -1;
     // public PREPASS_ALBEDO = false;
     // public PREPASS_ALBEDO_INDEX = -1;
-    // public PREPASS_DEPTHNORMAL = false;
-    // public PREPASS_DEPTHNORMAL_INDEX = -1;
+    // public PREPASS_DEPTH = false;
+    // public PREPASS_DEPTH_INDEX = -1;
+    // public PREPASS_NORMAL = false;
+    // public PREPASS_NORMAL_INDEX = -1;
     // public PREPASS_POSITION = false;
     // public PREPASS_POSITION_INDEX = -1;
     // public PREPASS_VELOCITY = false;
@@ -168,6 +182,16 @@ export class MToonMaterialDefines extends MaterialDefines {
     }
 
     public setReflectionMode(modeToEnable: string) {
+        // var modes = [
+        //     "REFLECTIONMAP_CUBIC", "REFLECTIONMAP_EXPLICIT", "REFLECTIONMAP_PLANAR",
+        //     "REFLECTIONMAP_PROJECTION", "REFLECTIONMAP_PROJECTION", "REFLECTIONMAP_SKYBOX",
+        //     "REFLECTIONMAP_SPHERICAL", "REFLECTIONMAP_EQUIRECTANGULAR", "REFLECTIONMAP_EQUIRECTANGULAR_FIXED",
+        //     "REFLECTIONMAP_MIRROREDEQUIRECTANGULAR_FIXED"
+        // ];
+        //
+        // for (var mode of modes) {
+        //     (<any>this)[mode] = (mode === modeToEnable);
+        // }
         throw new Error('This material cannot use `setReflectionMode`');
     }
 }

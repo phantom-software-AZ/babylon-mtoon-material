@@ -1,4 +1,4 @@
-// replace vBumpUV to mainUv
+// replace vBumpUV with mainUv
 vec2 uvOffset = vec2(0.0, 0.0);
 
 #if defined(BUMP) || defined(PARALLAX) || defined(DETAIL)
@@ -13,15 +13,18 @@ vec2 uvOffset = vec2(0.0, 0.0);
     #if defined(TANGENT) && defined(NORMAL)
         mat3 TBN = vTBN;
     #elif defined(BUMP)
-        mat3 TBN = cotangent_frame(normalW * normalScale, vPositionW, mainUv, vTangentSpaceParams);
+        vec2 TBNUV=gl_FrontFacing ? mainUv : -mainUv;
+        mat3 TBN=cotangent_frame(normalW*normalScale,vPositionW,TBNUV,vTangentSpaceParams);
     #else
-        mat3 TBN = cotangent_frame(normalW * normalScale, vPositionW, vDetailUV, vec2(1., 1.));
+        vec2 TBNUV=gl_FrontFacing ? vDetailUV : -vDetailUV;
+        mat3 TBN=cotangent_frame(normalW*normalScale,vPositionW,TBNUV,vec2(1.,1.));
     #endif
 #elif defined(ANISOTROPIC)
     #if defined(TANGENT) && defined(NORMAL)
         mat3 TBN = vTBN;
     #else
-        mat3 TBN = cotangent_frame(normalW, vPositionW, vMainUV1, vec2(1., 1.));
+        vec2 TBNUV=gl_FrontFacing ? vMainUV1 : -vMainUV1;
+        mat3 TBN=cotangent_frame(normalW,vPositionW,TBNUV,vec2(1.,1.));
     #endif
 #endif
 

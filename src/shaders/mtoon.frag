@@ -4,6 +4,7 @@
 #extension GL_OES_standard_derivatives : enable
 #endif
 
+#define CUSTOM_FRAGMENT_BEGIN
 #ifdef LOGARITHMICDEPTH
 #extension GL_EXT_frag_depth : enable
 #endif
@@ -13,9 +14,7 @@
 #define PI_2 6.28318530718
 #define EPS_COL 0.00001
 
-uniform vec3 vEyePosition;
 uniform vec3 vEyeUp;
-uniform vec3 vAmbientColor;
 uniform float aspect;
 uniform float isOutline;
 uniform vec4 time;
@@ -24,16 +23,12 @@ uniform vec4 time;
 varying vec3 vPositionW;
 
 #ifdef NORMAL
-varying vec3 vNormalW;
+    varying vec3 vNormalW;
 #endif
-
-#ifdef MAINUV1
-    varying vec2 vMainUV1;
+#ifdef VERTEXCOLOR
+varying vec4 vColor;
 #endif
-
-#ifdef MAINUV2
-    varying vec2 vMainUV2;
-#endif
+#include<mainUVVaryingDeclaration>[1..7]
 
 // Helper functions
 #include<helperFunctions>
@@ -45,102 +40,19 @@ varying vec3 vNormalW;
 #include<shadowsFragmentFunctions>
 
 // Samplers
-#ifdef DIFFUSE
-    #if DIFFUSEDIRECTUV == 1
-        #define vDiffuseUV vMainUV1
-    #elif DIFFUSEDIRECTUV == 2
-        #define vDiffuseUV vMainUV2
-    #else
-        varying vec2 vDiffuseUV;
-    #endif
-    uniform sampler2D diffuseSampler;
+#include<samplerFragmentDeclaration>(_DEFINENAME_,DIFFUSE,_VARYINGNAME_,Diffuse,_SAMPLERNAME_,diffuse)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,AMBIENT,_VARYINGNAME_,Ambient,_SAMPLERNAME_,ambient)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,EMISSIVE,_VARYINGNAME_,Emissive,_SAMPLERNAME_,emissive)
+#if defined(SPECULARTERM)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,SPECULAR,_VARYINGNAME_,Specular,_SAMPLERNAME_,specular)
 #endif
-
-#ifdef EMISSIVE
-    #if EMISSIVEDIRECTUV == 1
-        #define vEmissiveUV vMainUV1
-    #elif EMISSIVEDIRECTUV == 2
-        #define vEmissiveUV vMainUV2
-    #else
-        varying vec2 vEmissiveUV;
-    #endif
-    uniform sampler2D emissiveSampler;
-#endif
-
-#ifdef ALPHATEST
-     uniform float alphaCutOff;
-#endif
-
-#ifdef SHADE
-    uniform sampler2D shadeSampler;
-    #if SHADEDIRECTUV == 1
-        #define vShadeUV vMainUV1
-    #elif SHADEDIRECTUV == 2
-        #define vShadeUV vMainUV2
-    #else
-        varying vec2 vShadeUV;
-    #endif
-#endif
-#ifdef RECEIVE_SHADOW
-    uniform sampler2D receiveShadowSampler;
-    #if RECEIVE_SHADOWDIRECTUV == 1
-        #define vReceiveShadowUV vMainUV1
-    #elif RECEIVE_SHADOWDIRECTUV == 2
-        #define vReceiveShadowUV vMainUV2
-    #else
-        varying vec2 vReceiveShadowUV;
-    #endif
-#endif
-#ifdef SHADING_GRADE
-    uniform sampler2D shadingGradeSampler;
-    #if SHADING_GRADEDIRECTUV == 1
-        #define vShadingGradeUV vMainUV1
-    #elif SHADING_GRADEDIRECTUV == 2
-        #define vShadingGradeUV vMainUV2
-    #else
-        varying vec2 vShadingGradeUV;
-    #endif
-#endif
-#ifdef RIM
-    uniform sampler2D rimSampler;
-    #if RIMDIRECTUV == 1
-        #define vRimUV vMainUV1
-    #elif RIMDIRECTUV == 2
-        #define vRimUV vMainUV2
-    #else
-        varying vec2 vRimUV;
-    #endif
-#endif
-#ifdef MATCAP
-    uniform sampler2D matCapSampler;
-    #if MATCAPDIRECTUV == 1
-        #define vMatCapUV vMainUV1
-    #elif MATCAPDIRECTUV == 2
-        #define vMatCapUV vMainUV2
-    #else
-        varying vec2 vMatCapUV;
-    #endif
-#endif
-#ifdef OUTLINE_WIDTH
-    uniform sampler2D outlineWidthSampler;
-    #if OUTLINE_WIDTHDIRECTUV == 1
-        #define vOutlineWidthUV vMainUV1
-    #elif OUTLINE_WIDTHDIRECTUV == 2
-        #define vOutlineWidthUV vMainUV2
-    #else
-        varying vec2 vOutlineWidthUV;
-    #endif
-#endif
-#ifdef UV_ANIMATION_MASK
-    uniform sampler2D uvAnimationMaskSampler;
-    #if UV_ANIMATION_MASKDIRECTUV == 1
-        #define vUvAnimationMaskUV vMainUV1
-    #elif UV_ANIMATION_MASKDIRECTUV == 2
-        #define vUvAnimationMaskUV vMainUV2
-    #else
-        varying vec2 vUvAnimationMaskUV;
-    #endif
-#endif
+#include<samplerFragmentDeclaration>(_DEFINENAME_,SHADE,_VARYINGNAME_,Shade,_SAMPLERNAME_,shade)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,RECEIVE_SHADOW,_VARYINGNAME_,ReceiveShadow,_SAMPLERNAME_,receiveShadow)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,SHADING_GRADE,_VARYINGNAME_,ShadingGrade,_SAMPLERNAME_,shadingGrade)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,RIM,_VARYINGNAME_,Rim,_SAMPLERNAME_,rim)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,MATCAP,_VARYINGNAME_,MatCap,_SAMPLERNAME_,matCap)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,OUTLINE_WIDTH,_VARYINGNAME_,OutlineWidth,_SAMPLERNAME_,outlineWidth)
+#include<samplerFragmentDeclaration>(_DEFINENAME_,UV_ANIMATION_MASK,_VARYINGNAME_,UvAnimationMask,_SAMPLERNAME_,uvAnimationMask)
 
 /**
 * DirectionalLight, PointLight の角度を計算
@@ -287,7 +199,7 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
 #else
 #endif
 
-    // debug
+// debug
 #ifdef MTOON_DEBUG_NORMAL
     #ifdef MTOON_FORWARD_ADD
         return vec4(0.0);
@@ -311,25 +223,26 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
 #include<logDepthDeclaration>
 #include<fogFragmentDeclaration>
 
+#define CUSTOM_FRAGMENT_DEFINITIONS
 void main(void) {
-#ifdef MTOON_CLIP_IF_OUTLINE_IS_NONE
-    #ifdef MTOON_OUTLINE_WIDTH_WORLD
-    #elif defined(MTOON_OUTLINE_WIDTH_SCREEN)
-    #else
-        discard;
+    #define CUSTOM_FRAGMENT_MAIN_BEGIN
+    #ifdef MTOON_CLIP_IF_OUTLINE_IS_NONE
+        #ifdef MTOON_OUTLINE_WIDTH_WORLD
+        #elif defined(MTOON_OUTLINE_WIDTH_SCREEN)
+        #else
+            discard;
+        #endif
     #endif
-#endif
 
-#include<clipPlaneFragment>
-
-    vec3 viewDirectionW = normalize(vEyePosition - vPositionW);
+    #include<clipPlaneFragment>
+    vec3 viewDirectionW=normalize(vEyePosition.xyz-vPositionW);
 
     // Base color
     vec4 baseColor = vec4(1., 1., 1., 1.);
-    vec3 diffuseColor = vec3(1., 1., 1.);
+    vec3 diffuseColor=vDiffuseColor.rgb;
 
     // Alpha
-    float alpha = 1.0;
+    float alpha = vDiffuseColor.a;
 
     // Bump
 #ifdef NORMAL
@@ -338,21 +251,8 @@ void main(void) {
      vec3 normalW = normalize(-cross(dFdx(vPositionW), dFdy(vPositionW)));
 #endif
 
-#include<depthPrePass>
 
-    // Ambient color
-    vec3 baseAmbientColor = vec3(1., 1., 1.);
-    float glossiness = 0.;
-
-    // Lighting
-    vec3 diffuseBase = vec3(0., 0., 0.);
-    lightingInfo info;
-    float shadow = 1.;
-    vec3 lightDirection = vec3(0.0, 1.0, 0.0);
-    vec4 mtoonDiffuse = vec4(0.0, 0.0, 0.0, 1.0);
-
-    // MToon UV
-    // 全てのテクスチャは diffuse(_MainTex) の UV 情報を利用する
+// 全てのテクスチャは diffuse(_MainTex) の UV 情報を利用する
     vec2 mainUv = vec2(0.0);
 #ifdef DIFFUSE
     mainUv += vDiffuseUV;
@@ -360,36 +260,135 @@ void main(void) {
     mainUv += vMainUV1;
 #elif defined(MAINUV2)
     mainUv += vMainUV2;
+#elif defined(MAINUV3)
+    mainUv += vMainUV3;
+#elif defined(MAINUV4)
+    mainUv += vMainUV4;
+#elif defined(MAINUV5)
+    mainUv += vMainUV5;
+#elif defined(MAINUV6)
+    mainUv += vMainUV6;
 #endif
-
-    // uv anim
-    float uvAnim = time.y;
-#ifdef UV_ANIMATION_MASK
-    uvAnim *= texture2D(uvAnimationMaskSampler, mainUv).r;
-#endif
-    // translate uv in bottom-left origin coordinates.
-    // uv is reversed
-    mainUv += vec2(-uvAnimationScrollX, -uvAnimationScrollY) * uvAnim;
-    // rotate uv counter-clockwise around (0.5, 0.5) in bottom-left origin coordinates.
-    float rotateRad = uvAnimationRotation * PI_2 * uvAnim;
-    vec2 rotatePivot = vec2(0.5, 0.5);
-    mainUv = mat2(cos(rotateRad), -sin(rotateRad), sin(rotateRad), cos(rotateRad)) * (mainUv - rotatePivot) + rotatePivot;
 
 #include<mtoonBumpFragment>
-
 #ifdef TWOSIDEDLIGHTING
     normalW = gl_FrontFacing ? normalW : -normalW;
 #endif
 
+#ifdef DIFFUSE
+    baseColor=texture2D(diffuseSampler,vDiffuseUV+uvOffset);
+    #if defined(ALPHATEST) && !defined(ALPHATEST_AFTERALLALPHACOMPUTATIONS)
+        if (baseColor.a<alphaCutOff)
+            discard;
+    #endif
+    #ifdef ALPHAFROMDIFFUSE
+        alpha*=baseColor.a;
+    #endif
+    #define CUSTOM_FRAGMENT_UPDATE_ALPHA
+    baseColor.rgb*=vDiffuseInfos.y;
+#endif
+
+#include<depthPrePass>
+#define CUSTOM_FRAGMENT_UPDATE_DIFFUSE
+
+// Ambient color
+vec3 baseAmbientColor = vec3(1., 1., 1.);
+#ifdef AMBIENT
+    baseAmbientColor=texture2D(ambientSampler,vAmbientUV+uvOffset).rgb*vAmbientInfos.y;
+#endif
+
+
+#define CUSTOM_FRAGMENT_BEFORE_LIGHTS
+#ifdef SPECULARTERM
+    float glossiness=vSpecularColor.a;
+    vec3 specularColor=vSpecularColor.rgb;
+    #ifdef SPECULAR
+        vec4 specularMapColor=texture2D(specularSampler,vSpecularUV+uvOffset);
+        specularColor=specularMapColor.rgb;
+        #ifdef GLOSSINESS
+            glossiness=glossiness*specularMapColor.a;
+        #endif
+    #endif
+#else
+    float glossiness=0.;
+#endif
+
+// Lighting
+vec3 diffuseBase = vec3(0., 0., 0.);
+lightingInfo info;
+#ifdef SPECULARTERM
+    vec3 specularBase=vec3(0.,0.,0.);
+#endif
+float shadow = 1.;
+vec3 lightDirection = vec3(0.0, 1.0, 0.0);
+
+// MToon UV
+vec4 mtoonDiffuse = vec4(0.0, 0.0, 0.0, 1.0);
+
+// UV animation
+float uvAnim = time.y;
+#ifdef UV_ANIMATION_MASK
+    uvAnim *= texture2D(uvAnimationMaskSampler, mainUv).r;
+#endif
+// Translate UV in bottom-left origin coordinates.
+// UV is reversed
+mainUv += vec2(-uvAnimationScrollX, -uvAnimationScrollY) * uvAnim;
+
+// Rotate UV counter-clockwise around (0.5, 0.5) in bottom-left origin coordinates.
+float rotateRad = uvAnimationRotation * PI_2 * uvAnim;
+vec2 rotatePivot = vec2(0.5, 0.5);
+mainUv = mat2(cos(rotateRad), -sin(rotateRad), sin(rotateRad), cos(rotateRad)) * (mainUv - rotatePivot) + rotatePivot;
+
 // 通常の lightFragment ではなく、自前実装の mtoonLightFragment を読み込む
+#include<lightFragment>[0..maxSimultaneousLights]
 #include<mtoonLightFragment>[0..maxSimultaneousLights]
 
-    vec3 finalDiffuse = clamp(diffuseBase, 0.0, 1.0) * baseColor.rgb;
 
-    // Composition
-    vec4 color = vec4(finalDiffuse, clamp(alpha, 0.0, 1.0));
+#ifdef VERTEXALPHA
+    alpha*=vColor.a;
+#endif
 
-    color.rgb = max(color.rgb, 0.);
+#ifdef ALPHATEST
+    #ifdef ALPHATEST_AFTERALLALPHACOMPUTATIONS
+        if (alpha<alphaCutOff)
+            discard;
+    #endif
+    #ifndef ALPHABLEND
+        alpha=1.0;
+    #endif
+#endif
+
+vec3 emissiveColor=vEmissiveColor;
+#ifdef EMISSIVE
+    emissiveColor+=texture2D(emissiveSampler,vEmissiveUV+uvOffset).rgb*vEmissiveInfos.y;
+#endif
+
+#ifdef EMISSIVEASILLUMINATION
+    vec3 finalDiffuse=clamp(diffuseBase*diffuseColor+vAmbientColor,0.0,1.0)*baseColor.rgb;
+#else
+    #ifdef LINKEMISSIVEWITHDIFFUSE
+        vec3 finalDiffuse=clamp((diffuseBase+emissiveColor)*diffuseColor+vAmbientColor,0.0,1.0)*baseColor.rgb;
+    #else
+        vec3 finalDiffuse=clamp(diffuseBase*diffuseColor+emissiveColor+vAmbientColor,0.0,1.0)*baseColor.rgb;
+    #endif
+#endif
+#ifdef SPECULARTERM
+    vec3 finalSpecular=specularBase*specularColor;
+    #ifdef SPECULAROVERALPHA
+        alpha=clamp(alpha+dot(finalSpecular,vec3(0.3,0.59,0.11)),0.,1.);
+    #endif
+#else
+    vec3 finalSpecular=vec3(0.0);
+#endif
+
+#ifdef EMISSIVEASILLUMINATION
+    vec4 color=vec4(clamp(finalDiffuse*baseAmbientColor+emissiveColor+finalSpecular,0.0,1.0),alpha);
+#else
+    vec4 color=vec4(finalDiffuse*baseAmbientColor+finalSpecular,alpha);
+#endif
+
+#define CUSTOM_FRAGMENT_BEFORE_FOG
+color.rgb = max(color.rgb, 0.);
 #include<logDepthFragment>
 #include<fogFragment>
 
@@ -398,5 +397,7 @@ void main(void) {
     color.rgb *= color.a;
 #endif
 
-    gl_FragColor = color;
+#if !defined(PREPASS) || defined(WEBGL2)
+    gl_FragColor=color;
+#endif
 }

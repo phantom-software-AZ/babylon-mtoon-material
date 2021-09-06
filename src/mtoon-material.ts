@@ -24,7 +24,7 @@ import { DetailMapConfiguration } from "@babylonjs/core/Materials/material.detai
 import { getInspectableCustomProperties } from "./inspectable-custom-properties";
 import { MToonMaterialDefines } from "./mtoon-material-defines";
 import { MToonOutlineRenderer } from "./mtoon-outline-renderer";
-import {_TypeStore} from "@babylonjs/core";
+import {MaterialFlags, _TypeStore} from "@babylonjs/core";
 
 // シェーダ文字列を取得
 const UboDeclaration = require("./shaders/ubo-declaration.vert");
@@ -89,6 +89,14 @@ export class MToonMaterial extends PushMaterial {
      */
     @expandToProperty("_markAllSubMeshesAsTexturesAndMiscDirty")
     public diffuseTexture!: Nullable<BaseTexture>;
+
+    @serializeAsTexture("ambientTexture")
+    private _ambientTexture: Nullable<BaseTexture> = null;
+    /**
+     * AKA Occlusion Texture in other nomenclature, it helps adding baked shadows into your material.
+     */
+    @expandToProperty("_markAllSubMeshesAsTexturesDirty")
+    public ambientTexture!: Nullable<BaseTexture>;
 
     @serializeAsTexture("emissiveTexture")
     private _emissiveTexture: Nullable<BaseTexture> = null;
@@ -181,6 +189,7 @@ export class MToonMaterial extends PushMaterial {
     private appendedActiveTextures(): BaseTexture[] {
         return [
             this._diffuseTexture,
+            this._ambientTexture,
             this._emissiveTexture,
             this._specularTexture,
             this._bumpTexture,
@@ -369,6 +378,13 @@ export class MToonMaterial extends PushMaterial {
      */
     public readonly prePassConfiguration: PrePassConfiguration;
 
+    /**
+     * Can this material render to prepass
+     */
+    public get isPrePassCapable(): boolean {
+        return true;
+    }
+
     public get canRenderToMRT() {
         return false;
     }
@@ -381,12 +397,11 @@ export class MToonMaterial extends PushMaterial {
     protected _worldViewProjectionMatrix = Matrix.Zero();
     protected _globalAmbientColor = new Color3(0, 0, 0);
     protected _useLogarithmicDepth!: boolean;
-    protected _rebuildInParallel = false;
 //#endregion
 
 //#region MToon parameters
     @serialize("bumpScale")
-    private _bumpScale = 1;
+    private _bumpScale = 0.1;
     @expandToProperty("_markAllSubMeshesAsTexturesAndMiscDirty")
     public bumpScale!: number;
 
@@ -583,7 +598,7 @@ export class MToonMaterial extends PushMaterial {
     }
 
     /**
-     * Gets the current class name of the material e.g. "StandardMaterialTs"
+     * Gets the current class name of the material e.g. "StandardMaterial"
      * Mainly use in serialization.
      * @returns the class name
      */
@@ -660,7 +675,7 @@ export class MToonMaterial extends PushMaterial {
      * @param useInstances specifies that instances should be used
      * @returns a boolean indicating that the submesh is ready or not
      */
-    public isReadyForSubMesh(mesh: AbstractMesh, subMesh: SubMesh, useInstances = false): boolean {
+    public isReadyForSubMesh(mesh: AbstractMesh, subMesh: SubMesh, useInstances: boolean = false): boolean {
         if (subMesh.effect && this.isFrozen) {
             if (subMesh.effect._wasPreviouslyReady) {
                 return true;
@@ -700,10 +715,11 @@ export class MToonMaterial extends PushMaterial {
             this.applyDefines(defines);
 
             defines._needUVs = false;
-            defines.MAINUV1 = false;
-            defines.MAINUV2 = false;
+            for (let i = 1; i <= Constants.MAX_SUPPORTED_UV_SETS; ++i) {
+                defines["MAINUV" + i] = false;
+            }
             if (scene.texturesEnabled) {
-                if (this._diffuseTexture) {
+                if (this._diffuseTexture && MToonMaterial.DiffuseTextureEnabled) {
                     if (!this._diffuseTexture.isReadyOrNotBlocking()) {
                         return false;
                     } else {
@@ -713,7 +729,17 @@ export class MToonMaterial extends PushMaterial {
                     defines.DIFFUSE = false;
                 }
 
-                if (this._emissiveTexture) {
+                if (this._ambientTexture && MToonMaterial.AmbientTextureEnabled) {
+                    if (!this._ambientTexture.isReadyOrNotBlocking()) {
+                        return false;
+                    } else {
+                        MaterialHelper.PrepareDefinesForMergedUV(this._ambientTexture, defines, "AMBIENT");
+                    }
+                } else {
+                    defines.AMBIENT = false;
+                }
+
+                if (this._emissiveTexture && MToonMaterial.EmissiveTextureEnabled) {
                     if (!this._emissiveTexture.isReadyOrNotBlocking()) {
                         return false;
                     } else {
@@ -723,7 +749,7 @@ export class MToonMaterial extends PushMaterial {
                     defines.EMISSIVE = false;
                 }
 
-                if (this._specularTexture) {
+                if (this._specularTexture && MToonMaterial.SpecularTextureEnabled) {
                     if (!this._specularTexture.isReadyOrNotBlocking()) {
                         return false;
                     } else {
@@ -735,7 +761,7 @@ export class MToonMaterial extends PushMaterial {
                 }
 
                 if (scene.getEngine().getCaps().standardDerivatives && this._bumpTexture) {
-                    // Bump texure can not be not blocking.
+                    // Bump texture can not be not blocking.
                     if (!this._bumpTexture.isReady()) {
                         return false;
                     } else {
@@ -823,8 +849,8 @@ export class MToonMaterial extends PushMaterial {
                 defines.TWOSIDEDLIGHTING = !this._backFaceCulling && this._twoSidedLighting;
             } else {
                 defines.DIFFUSE = false;
+                defines.AMBIENT = false;
                 defines.EMISSIVE = false;
-                defines.SPECULAR = false;
                 defines.BUMP = false;
                 defines.SHADE = false;
                 defines.RECEIVE_SHADOW = false;
@@ -944,12 +970,14 @@ export class MToonMaterial extends PushMaterial {
                 attribs.push(VertexBuffer.NormalKind);
             }
 
-            if (defines.UV1) {
-                attribs.push(VertexBuffer.UVKind);
+            if (defines.TANGENT) {
+                attribs.push(VertexBuffer.TangentKind);
             }
 
-            if (defines.UV2) {
-                attribs.push(VertexBuffer.UV2Kind);
+            for (let i = 1; i <= Constants.MAX_SUPPORTED_UV_SETS; ++i) {
+                if (defines["UV" + i]) {
+                    attribs.push(`uv${i === 1 ? "" : i}`);
+                }
             }
 
             if (defines.VERTEXCOLOR) {
@@ -963,12 +991,12 @@ export class MToonMaterial extends PushMaterial {
             let shaderName = "mtoon";
 
             const uniforms = ["world", "view", "viewProjection", "vEyePosition", "vLightsType",
-                "vDiffuseColor", "vSpecularColor", "vEmissiveColor", "visibility",
+                "vAmbientColor", "vDiffuseColor", "vSpecularColor", "vEmissiveColor", "visibility",
                 "vFogInfos", "vFogColor", "pointSize",
-                "vDiffuseInfos", "vEmissiveInfos", "vBumpInfos",
+                "vDiffuseInfos", "vAmbientInfos", "vEmissiveInfos", "vSpecularInfos", "vBumpInfos",
                 "mBones",
                 "vClipPlane", "vClipPlane2", "vClipPlane3", "vClipPlane4", "vClipPlane5", "vClipPlane6",
-                "diffuseMatrix", "emissiveMatrix", "bumpMatrix",
+                "diffuseMatrix", "ambientMatrix", "emissiveMatrix", "specularMatrix", "bumpMatrix",
                 "logarithmicDepthConstant", "vTangentSpaceParams", "alphaCutOff", "boneTextureWidth",
 
                 "vShadeColor", "vShadeInfos", "shadeMatrix",
@@ -990,8 +1018,8 @@ export class MToonMaterial extends PushMaterial {
                 "morphTargetTextureInfo", "morphTargetTextureIndices"
             ];
 
-            const samplers = ["diffuseSampler", "emissiveSampler", "specularSampler", "bumpSampler",
-                "boneSampler",
+            const samplers = ["diffuseSampler", "ambientSampler", "emissiveSampler",
+                "specularSampler", "bumpSampler", "boneSampler",
                 "shadeSampler", "receiveShadowSampler", "shadingGradeSampler",
                 "rimSampler", "matCapSampler", "outlineWidthSampler",
                 "uvAnimationMaskSampler", "morphTargets",
@@ -1048,7 +1076,6 @@ export class MToonMaterial extends PushMaterial {
                 // Use previous effect while new one is compiling
                 if (this.allowShaderHotSwapping && previousEffect && !effect.isReady()) {
                     effect = previousEffect;
-                    this._rebuildInParallel = true;
                     defines.markAsUnprocessed();
 
                     if (lightDisposed) {
@@ -1057,9 +1084,8 @@ export class MToonMaterial extends PushMaterial {
                         return false;
                     }
                 } else {
-                    this._rebuildInParallel = false;
                     scene.resetCachedMaterial();
-                    subMesh.setEffect(effect, defines);
+                    subMesh.setEffect(effect, defines, this._materialContext);
                     this.buildUniformLayout();
                 }
             }
@@ -1079,7 +1105,7 @@ export class MToonMaterial extends PushMaterial {
      * Builds the material UBO layouts.
      * Used internally during the effect preparation.
      */
-    protected buildUniformLayout(): void {
+    public buildUniformLayout(): void {
         // Order is important !
         const ubo = this._uniformBuffer;
 
@@ -1087,7 +1113,14 @@ export class MToonMaterial extends PushMaterial {
         ubo.addUniform("vDiffuseInfos", 2);
         ubo.addUniform("diffuseMatrix", 16);
 
-        ubo.addUniform("vSpecularColor", 3);
+        ubo.addUniform("vSpecularColor", 4);
+        ubo.addUniform("vSpecularInfos", 2);
+        ubo.addUniform("specularMatrix", 16);
+
+        ubo.addUniform("vAmbientColor", 3);
+        ubo.addUniform("vAmbientInfos", 2);
+        ubo.addUniform("ambientMatrix", 16);
+
         ubo.addUniform("vEmissiveColor", 3);
         ubo.addUniform("vEmissiveInfos", 2);
         ubo.addUniform("emissiveMatrix", 16);
@@ -1121,6 +1154,7 @@ export class MToonMaterial extends PushMaterial {
 
         ubo.addUniform("vTangentSpaceParams", 2);
         ubo.addUniform("pointSize", 1);
+        ubo.addUniform("alphaCutOff", 1);
 
         ubo.addUniform("shadingGradeRate", 1);
         ubo.addUniform("receiveShadowRate", 1);
@@ -1170,10 +1204,9 @@ export class MToonMaterial extends PushMaterial {
         }
         this._activeEffect = effect;
 
-        // Matrices
-        if (!defines.INSTANCES || defines.THIN_INSTANCES) {
-            this.bindOnlyWorldMatrix(world);
-        }
+        // Matrices Mesh.
+        mesh.getMeshUniformBuffer().bindToEffect(effect, "Mesh");
+        mesh.transferToEffect(world);
 
         // PrePass
         this.prePassConfiguration.bindForSubMesh(this._activeEffect, scene, mesh, world, this.isFrozen);
@@ -1184,7 +1217,6 @@ export class MToonMaterial extends PushMaterial {
             this.bindOnlyNormalMatrix(this._normalMatrix);
         }
 
-        // const mustRebind = scene.isCachedMaterialInvalid(this, effect, mesh.visibility);
         const mustRebind = this._mustRebind(scene, effect, mesh.visibility);
 
         // Bones
@@ -1197,26 +1229,31 @@ export class MToonMaterial extends PushMaterial {
             if (!ubo.useUbo || !this.isFrozen || !ubo.isSync) {
                 // Textures
                 if (scene.texturesEnabled) {
-                    if (this._diffuseTexture) {
+                    if (this._diffuseTexture && MToonMaterial.DiffuseTextureEnabled) {
                         ubo.updateFloat2("vDiffuseInfos", this._diffuseTexture.coordinatesIndex, this._diffuseTexture.level);
                         MaterialHelper.BindTextureMatrix(this._diffuseTexture, ubo, "diffuse");
                     }
 
-                    if (this._hasAlphaChannel()) {
-                        effect.setFloat("alphaCutOff", this.alphaCutOff);
+                    if (this._ambientTexture && MToonMaterial.AmbientTextureEnabled) {
+                        ubo.updateFloat2("vAmbientInfos", this._ambientTexture.coordinatesIndex, this._ambientTexture.level);
+                        MaterialHelper.BindTextureMatrix(this._ambientTexture, ubo, "ambient");
                     }
 
-                    if (this._emissiveTexture) {
+                    if (this._hasAlphaChannel()) {
+                        ubo.updateFloat("alphaCutOff", this.alphaCutOff);
+                    }
+
+                    if (this._emissiveTexture && MToonMaterial.EmissiveTextureEnabled) {
                         ubo.updateFloat2("vEmissiveInfos", this._emissiveTexture.coordinatesIndex, this._emissiveTexture.level);
                         MaterialHelper.BindTextureMatrix(this._emissiveTexture, ubo, "emissive");
                     }
 
-                    if (this._specularTexture) {
+                    if (this._specularTexture && MToonMaterial.SpecularTextureEnabled) {
                         ubo.updateFloat2("vSpecularInfos", this._specularTexture.coordinatesIndex, this._specularTexture.level);
                         MaterialHelper.BindTextureMatrix(this._specularTexture, ubo, "specular");
                     }
 
-                    if (this._bumpTexture && scene.getEngine().getCaps().standardDerivatives) {
+                    if (this._bumpTexture && scene.getEngine().getCaps().standardDerivatives && MToonMaterial.BumpTextureEnabled) {
                         ubo.updateFloat3("vBumpInfos", this._bumpTexture.coordinatesIndex, 1.0 / this._bumpTexture.level, this.parallaxScaleBias);
                         MaterialHelper.BindTextureMatrix(this._bumpTexture, ubo, "bump");
 
@@ -1272,10 +1309,12 @@ export class MToonMaterial extends PushMaterial {
             if (defines.SPECULARTERM) {
                 ubo.updateColor4("vSpecularColor", this.specularColor, this.specularPower);
             }
-            ubo.updateColor3("vEmissiveColor", this.emissiveColor);
 
-            // Diffuse
+            ubo.updateColor3("vEmissiveColor", this.emissiveColor);
             ubo.updateColor4("vDiffuseColor", this.diffuseColor, this.alpha);
+
+            scene.ambientColor.multiplyToRef(this.ambientColor, this._globalAmbientColor);
+            ubo.updateColor3("vAmbientColor", this._globalAmbientColor);
 
             // MToon uniforms
             ubo.updateFloat("receiveShadowRate", this._receiveShadowRate);
@@ -1296,19 +1335,23 @@ export class MToonMaterial extends PushMaterial {
 
             // Textures
             if (scene.texturesEnabled) {
-                if (this._diffuseTexture) {
+                if (this._diffuseTexture && MToonMaterial.DiffuseTextureEnabled) {
                     effect.setTexture("diffuseSampler", this._diffuseTexture);
                 }
 
-                if (this._emissiveTexture) {
+                if (this._ambientTexture && MToonMaterial.AmbientTextureEnabled) {
+                    effect.setTexture("ambientSampler", this._ambientTexture);
+                }
+
+                if (this._emissiveTexture && MToonMaterial.EmissiveTextureEnabled) {
                     effect.setTexture("emissiveSampler", this._emissiveTexture);
                 }
 
-                if (this._specularTexture) {
+                if (this._specularTexture && MToonMaterial.SpecularTextureEnabled) {
                     effect.setTexture("specularSampler", this._specularTexture);
                 }
 
-                if (this._bumpTexture && scene.getEngine().getCaps().standardDerivatives) {
+                if (this._bumpTexture && scene.getEngine().getCaps().standardDerivatives && MToonMaterial.BumpTextureEnabled) {
                     effect.setTexture("bumpSampler", this._bumpTexture);
                 }
 
@@ -1347,10 +1390,7 @@ export class MToonMaterial extends PushMaterial {
             MaterialHelper.BindClipPlane(effect, scene);
 
             // Colors
-            scene.ambientColor.multiplyToRef(this.ambientColor, this._globalAmbientColor);
-
-            scene.bindEyePosition(effect);
-            effect.setColor3("vAmbientColor", this._globalAmbientColor);
+            this.bindEyePosition(effect);
             effect.setVector3("vEyeUp", scene.activeCamera!.upVector);
             ubo.updateColor3("vShadeColor", this.shadeColor);
             ubo.updateColor3("vRimColor", this.rimColor);
@@ -1364,7 +1404,7 @@ export class MToonMaterial extends PushMaterial {
             }
 
             // View
-            if (scene.fogEnabled && mesh.applyFog && scene.fogMode !== Scene.FOGMODE_NONE) {
+            if (scene.fogEnabled && mesh.applyFog && scene.fogMode !== Scene.FOGMODE_NONE || mesh.receiveShadows) {
                 this.bindView(effect);
             }
 
@@ -1381,6 +1421,7 @@ export class MToonMaterial extends PushMaterial {
                 MaterialHelper.BindLogDepth(defines, effect, scene);
             }
         }
+
         effect.setFloat("aspect", scene.getEngine().getAspectRatio(scene.activeCamera!));
         effect.setFloat("isOutline", 0);
         const t = window.performance.now() / 1000;
@@ -1391,8 +1432,8 @@ export class MToonMaterial extends PushMaterial {
             t * 3,
         ));
 
-        ubo.update();
         this._afterBind(mesh, this._activeEffect);
+        ubo.update();
     }
 
     /**
@@ -1448,8 +1489,7 @@ export class MToonMaterial extends PushMaterial {
      */
     public dispose(
         forceDisposeEffect?: boolean,
-        forceDisposeTextures?: boolean,
-        notBoundToMesh?: boolean,
+        forceDisposeTextures?: boolean
     ): void {
         if (forceDisposeTextures) {
             this.appendedActiveTextures().forEach((e) => e.dispose());
@@ -1543,6 +1583,8 @@ export class MToonMaterial extends PushMaterial {
         result.name = name;
         result.id = name;
 
+        this.stencil.copyTo(result.stencil);
+
         return result;
     }
 
@@ -1551,7 +1593,11 @@ export class MToonMaterial extends PushMaterial {
      * @returns the serialized material object
      */
     public serialize(): any {
-        return SerializationHelper.Serialize(this);
+        const serializationObject = SerializationHelper.Serialize(this);
+
+        serializationObject.stencil = this.stencil.serialize();
+
+        return serializationObject;
     }
 
     /**
@@ -1562,9 +1608,67 @@ export class MToonMaterial extends PushMaterial {
      * @returns a new standard material
      */
     public static Parse(source: any, scene: Scene, rootUrl: string): MToonMaterial {
-        return SerializationHelper.Parse(() => new MToonMaterial(source.name, scene), source, scene, rootUrl);
+        const material = SerializationHelper.Parse(() => new MToonMaterial(source.name, scene), source, scene, rootUrl);
+
+        if (source.stencil) {
+            material.stencil.parse(source.stencil, scene, rootUrl);
+        }
+
+        return material;
     }
 //#endregion
+
+    // Flags used to enable or disable a type of texture for all Standard Materials
+    /**
+     * Are diffuse textures enabled in the application.
+     */
+    public static get DiffuseTextureEnabled(): boolean {
+        return MaterialFlags.DiffuseTextureEnabled;
+    }
+    public static set DiffuseTextureEnabled(value: boolean) {
+        MaterialFlags.DiffuseTextureEnabled = value;
+    }
+
+    /**
+     * Are ambient textures enabled in the application.
+     */
+    public static get AmbientTextureEnabled(): boolean {
+        return MaterialFlags.AmbientTextureEnabled;
+    }
+    public static set AmbientTextureEnabled(value: boolean) {
+        MaterialFlags.AmbientTextureEnabled = value;
+    }
+
+    /**
+     * Are emissive textures enabled in the application.
+     */
+    public static get EmissiveTextureEnabled(): boolean {
+        return MaterialFlags.EmissiveTextureEnabled;
+    }
+    public static set EmissiveTextureEnabled(value: boolean) {
+        MaterialFlags.EmissiveTextureEnabled = value;
+    }
+
+    /**
+     * Are specular textures enabled in the application.
+     */
+    public static get SpecularTextureEnabled(): boolean {
+        return MaterialFlags.SpecularTextureEnabled;
+    }
+    public static set SpecularTextureEnabled(value: boolean) {
+        MaterialFlags.SpecularTextureEnabled = value;
+    }
+
+    /**
+     * Are bump textures enabled in the application.
+     */
+    public static get BumpTextureEnabled(): boolean {
+        return MaterialFlags.BumpTextureEnabled;
+    }
+    public static set BumpTextureEnabled(value: boolean) {
+        MaterialFlags.BumpTextureEnabled = value;
+    }
+
 }
 
 _TypeStore.RegisteredTypes["BABYLON.MToonMaterial"] = MToonMaterial;
