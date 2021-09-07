@@ -14,6 +14,11 @@
 #define PI_2 6.28318530718
 #define EPS_COL 0.00001
 
+//uniform vec3 vEyePosition;
+//uniform vec3 vAmbientColor;
+//#ifdef ALPHATEST
+//uniform float alphaCutOff;
+//#endif
 uniform vec3 vEyeUp;
 uniform float aspect;
 uniform float isOutline;
@@ -26,7 +31,7 @@ varying vec3 vPositionW;
     varying vec3 vNormalW;
 #endif
 #ifdef VERTEXCOLOR
-varying vec4 vColor;
+    varying vec4 vColor;
 #endif
 #include<mainUVVaryingDeclaration>[1..7]
 
@@ -239,12 +244,14 @@ void main(void) {
 
     // Base color
     vec4 baseColor = vec4(1., 1., 1., 1.);
-    vec3 diffuseColor=vDiffuseColor.rgb;
+    vec3 diffuseColor = vec3(1., 1., 1.);
+//    vec3 diffuseColor=vDiffuseColor.rgb;
 
     // Alpha
-    float alpha = vDiffuseColor.a;
+    float alpha = 1.0;
+//    float alpha = vDiffuseColor.a;
 
-    // Bump
+// Bump
 #ifdef NORMAL
      vec3 normalW = normalize(vNormalW);
 #else
@@ -252,8 +259,9 @@ void main(void) {
 #endif
 
 
+// MToon UV
 // 全てのテクスチャは diffuse(_MainTex) の UV 情報を利用する
-    vec2 mainUv = vec2(0.0);
+vec2 mainUv = vec2(0.0);
 #ifdef DIFFUSE
     mainUv += vDiffuseUV;
 #elif defined(MAINUV1)
@@ -270,13 +278,27 @@ void main(void) {
     mainUv += vMainUV6;
 #endif
 
+// UV animation
+float uvAnim = time.y;
+#ifdef UV_ANIMATION_MASK
+uvAnim *= texture2D(uvAnimationMaskSampler, mainUv).r;
+#endif
+// Translate UV in bottom-left origin coordinates.
+// UV is reversed
+mainUv += vec2(-uvAnimationScrollX, -uvAnimationScrollY) * uvAnim;
+
+// Rotate UV counter-clockwise around (0.5, 0.5) in bottom-left origin coordinates.
+float rotateRad = uvAnimationRotation * PI_2 * uvAnim;
+vec2 rotatePivot = vec2(0.5, 0.5);
+mainUv = mat2(cos(rotateRad), -sin(rotateRad), sin(rotateRad), cos(rotateRad)) * (mainUv - rotatePivot) + rotatePivot;
+
 #include<mtoonBumpFragment>
 #ifdef TWOSIDEDLIGHTING
     normalW = gl_FrontFacing ? normalW : -normalW;
 #endif
 
 #ifdef DIFFUSE
-    baseColor=texture2D(diffuseSampler,vDiffuseUV+uvOffset);
+//    baseColor=texture2D(diffuseSampler,vDiffuseUV+uvOffset);
     #if defined(ALPHATEST) && !defined(ALPHATEST_AFTERALLALPHACOMPUTATIONS)
         if (baseColor.a<alphaCutOff)
             discard;
@@ -296,7 +318,6 @@ vec3 baseAmbientColor = vec3(1., 1., 1.);
 #ifdef AMBIENT
     baseAmbientColor=texture2D(ambientSampler,vAmbientUV+uvOffset).rgb*vAmbientInfos.y;
 #endif
-
 
 #define CUSTOM_FRAGMENT_BEFORE_LIGHTS
 #ifdef SPECULARTERM
@@ -322,27 +343,10 @@ lightingInfo info;
 float shadow = 1.;
 vec3 lightDirection = vec3(0.0, 1.0, 0.0);
 
-// MToon UV
 vec4 mtoonDiffuse = vec4(0.0, 0.0, 0.0, 1.0);
 
-// UV animation
-float uvAnim = time.y;
-#ifdef UV_ANIMATION_MASK
-    uvAnim *= texture2D(uvAnimationMaskSampler, mainUv).r;
-#endif
-// Translate UV in bottom-left origin coordinates.
-// UV is reversed
-mainUv += vec2(-uvAnimationScrollX, -uvAnimationScrollY) * uvAnim;
-
-// Rotate UV counter-clockwise around (0.5, 0.5) in bottom-left origin coordinates.
-float rotateRad = uvAnimationRotation * PI_2 * uvAnim;
-vec2 rotatePivot = vec2(0.5, 0.5);
-mainUv = mat2(cos(rotateRad), -sin(rotateRad), sin(rotateRad), cos(rotateRad)) * (mainUv - rotatePivot) + rotatePivot;
-
 // 通常の lightFragment ではなく、自前実装の mtoonLightFragment を読み込む
-#include<lightFragment>[0..maxSimultaneousLights]
 #include<mtoonLightFragment>[0..maxSimultaneousLights]
-
 
 #ifdef VERTEXALPHA
     alpha*=vColor.a;
@@ -358,7 +362,7 @@ mainUv = mat2(cos(rotateRad), -sin(rotateRad), sin(rotateRad), cos(rotateRad)) *
     #endif
 #endif
 
-vec3 emissiveColor=vEmissiveColor;
+vec3 emissiveColor=vEmissiveColor.rgb;
 #ifdef EMISSIVE
     emissiveColor+=texture2D(emissiveSampler,vEmissiveUV+uvOffset).rgb*vEmissiveInfos.y;
 #endif

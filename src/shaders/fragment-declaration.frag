@@ -17,7 +17,7 @@ uniform vec4 vOutlineColor;
 #ifdef DIFFUSE
 uniform vec2 vDiffuseInfos;
 #endif
-#ifdef AMBIENT`
+#ifdef AMBIENT
 uniform vec2 vAmbientInfos;
 #endif
 #ifdef EMISSIVE

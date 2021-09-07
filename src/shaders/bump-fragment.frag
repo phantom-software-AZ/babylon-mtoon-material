@@ -50,7 +50,7 @@ vec2 uvOffset = vec2(0.0, 0.0);
         normalW = normalize(texture2D(bumpSampler, mainUv).xyz  * 2.0 - 1.0);
         normalW = normalize(mat3(normalMatrix) * normalW);
     #elif !defined(DETAIL)
-        normalW = perturbNormal(TBN, texture2D(bumpSampler, vBumpUV + uvOffset).xyz, vBumpInfos.y);
+        normalW = perturbNormal(TBN, texture2D(bumpSampler, mainUv + uvOffset).xyz, vBumpInfos.y);
     #else
         vec3 bumpNormal = texture2D(bumpSampler, mainUv + uvOffset).xyz * 2.0 - 1.0;
         // Reference for normal blending: https://blog.selfshadow.com/publications/blending-in-detail/
