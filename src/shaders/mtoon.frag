@@ -243,6 +243,7 @@ void main(void) {
     vec3 viewDirectionW=normalize(vEyePosition.xyz-vPositionW);
 
     // Base color
+    // Strangely MToon decided to use base diffuse color as light color
     vec4 baseColor = vec4(1., 1., 1., 1.);
     vec3 diffuseColor = vec3(1., 1., 1.);
 //    vec3 diffuseColor=vDiffuseColor.rgb;
@@ -363,17 +364,18 @@ vec4 mtoonDiffuse = vec4(0.0, 0.0, 0.0, 1.0);
 #endif
 
 vec3 emissiveColor=vEmissiveColor.rgb;
-#ifdef EMISSIVE
-    emissiveColor+=texture2D(emissiveSampler,vEmissiveUV+uvOffset).rgb*vEmissiveInfos.y;
-#endif
+// MToon use emissive texture in a non-standard way
+//#ifdef EMISSIVE
+//    emissiveColor+=texture2D(emissiveSampler,vEmissiveUV+uvOffset).rgb*vEmissiveInfos.y;
+//#endif
 
 #ifdef EMISSIVEASILLUMINATION
     vec3 finalDiffuse=clamp(diffuseBase*diffuseColor+vAmbientColor,0.0,1.0)*baseColor.rgb;
 #else
     #ifdef LINKEMISSIVEWITHDIFFUSE
-        vec3 finalDiffuse=clamp((diffuseBase+emissiveColor)*diffuseColor+vAmbientColor,0.0,1.0)*baseColor.rgb;
+        vec3 finalDiffuse=clamp((diffuseBase)*diffuseColor+vAmbientColor,0.0,1.0)*baseColor.rgb;
     #else
-        vec3 finalDiffuse=clamp(diffuseBase*diffuseColor+emissiveColor+vAmbientColor,0.0,1.0)*baseColor.rgb;
+        vec3 finalDiffuse=clamp(diffuseBase*diffuseColor+vAmbientColor,0.0,1.0)*baseColor.rgb;
     #endif
 #endif
 #ifdef SPECULARTERM
@@ -386,7 +388,7 @@ vec3 emissiveColor=vEmissiveColor.rgb;
 #endif
 
 #ifdef EMISSIVEASILLUMINATION
-    vec4 color=vec4(clamp(finalDiffuse*baseAmbientColor+emissiveColor+finalSpecular,0.0,1.0),alpha);
+    vec4 color=vec4(clamp(finalDiffuse*baseAmbientColor+finalSpecular,0.0,1.0),alpha);
 #else
     vec4 color=vec4(finalDiffuse*baseAmbientColor+finalSpecular,alpha);
 #endif

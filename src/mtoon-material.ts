@@ -594,7 +594,9 @@ export class MToonMaterial extends PushMaterial {
         }
 
         // Append custom inspectors
-        this.inspectableCustomProperties?.concat(getInspectableCustomProperties());
+        this.inspectableCustomProperties = this.inspectableCustomProperties ?
+            this.inspectableCustomProperties.concat(getInspectableCustomProperties())
+            : getInspectableCustomProperties();
     }
 
     /**
