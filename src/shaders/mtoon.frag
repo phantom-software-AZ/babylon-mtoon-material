@@ -83,6 +83,7 @@ vec3 computeHemisphericLightDirection(vec4 lightData, vec3 vNormal) {
 /**
 * MToon シェーダーの陰実装
 */
+//#define MTOON_FORWARD_ADD
 vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, vec3 lightDirection, vec4 lightDiffuse, float shadowAttenuation) {
     float _receiveShadow = receiveShadowRate;
 #ifdef RECEIVE_SHADOW
@@ -96,8 +97,8 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
     _shadingGrade = 1.0 - shadingGradeRate * _shadingGrade;
 
     // Lighting
-    vec3 _lightColor = lightDiffuse.rgb * step(0.5, length(lightDirection)); // length(lightDir) is zero if directional light is disabled.
     float _dotNL = dot(lightDirection, worldNormal);
+    vec3 _lightColor = lightDiffuse.rgb * step(0.5, length(lightDirection)); // length(lightDir) is zero if directional light is disabled.
 #ifdef MTOON_FORWARD_ADD
     float _lightAttenuation = 1.0;
 #else
@@ -132,10 +133,12 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
     _lighting = mix(_lighting, vec3(max(EPS_COL, max(_lighting.x, max(_lighting.y, _lighting.z)))), lightColorAttenuation); // color atten
 #ifdef MTOON_FORWARD_ADD
     _lighting *= 0.5; // darken if additional light
-    _lighting *= min(0, dotNL) + 1.0; // darken dotNL < 0 area by using half lambert
+    _lighting *= min(0., _dotNL) + 1.0; // darken dotNL < 0 area by using half lambert
     _lighting *= shadowAttenuation; // darken if receiving shadow
 #else
     // base light does not darken.
+    // Make material receive shadow.
+    _lighting *= shadowAttenuation;
 #endif
     _col *= _lighting;
 
@@ -205,6 +208,7 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
 #endif
 
 // debug
+//#define MTOON_DEBUG_LITSHADERATE
 #ifdef MTOON_DEBUG_NORMAL
     #ifdef MTOON_FORWARD_ADD
         return vec4(0.0);
@@ -215,7 +219,7 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
     #ifdef MTOON_FORWARD_ADD
         return vec4(0.0);
     #else
-        return vec4(_lightIntensity, _lit.a);
+        return vec4(_lightIntensity, _lightIntensity, _lightIntensity, _lit.a);
     #endif
 #endif
 
