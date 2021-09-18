@@ -13,6 +13,7 @@
 #define RECIPROCAL_PI2 0.15915494
 #define PI_2 6.28318530718
 #define EPS_COL 0.00001
+#define MAX_NUM_LIGHTS 16
 
 //uniform vec3 vEyePosition;
 //uniform vec3 vAmbientColor;
@@ -84,7 +85,41 @@ vec3 computeHemisphericLightDirection(vec4 lightData, vec3 vNormal) {
 * MToon シェーダーの陰実装
 */
 //#define MTOON_FORWARD_ADD
+/**
+* Calculate light seoarately
+*/
+int realNumLights = 0;
+vec3 totalDirectLighting = vec3(0.);
+vec3 directLightingArr[MAX_NUM_LIGHTS] = vec3[MAX_NUM_LIGHTS](
+    vec3(0.), vec3(0.), vec3(0.), vec3(0.),
+    vec3(0.), vec3(0.), vec3(0.), vec3(0.),
+    vec3(0.), vec3(0.), vec3(0.), vec3(0.),
+    vec3(0.), vec3(0.), vec3(0.), vec3(0.)
+);
+void computeDirectLight(vec3 worldNormal, vec3 lightDirection, vec4 lightDiffuse, float shadowAttenuation) {
+    realNumLights += 1;
+    float _dotNL = dot(lightDirection, worldNormal);
+    vec3 _lightColor = lightDiffuse.rgb * step(0.5, length(lightDirection)); // length(lightDir) is zero if directional light is disabled.
+    // Direct Light
+    vec3 _lighting = _lightColor;
+    _lighting = mix(_lighting, vec3(max(EPS_COL, max(_lighting.x, max(_lighting.y, _lighting.z)))), lightColorAttenuation); // color atten
+    #ifdef MTOON_FORWARD_ADD
+    _lighting *= 0.5; // darken if additional light
+    _lighting *= min(0., _dotNL) + 1.0; // darken dotNL < 0 area by using half lambert
+    _lighting *= shadowAttenuation; // darken if receiving shadow
+    #else
+    // base light does not darken.
+    // Make material receive shadow.
+    _lighting *= shadowAttenuation;
+    #endif
+
+    // Compress total light
+    directLightingArr[realNumLights] = _lighting;
+    totalDirectLighting += _lighting;
+}
+
 vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, vec3 lightDirection, vec4 lightDiffuse, float shadowAttenuation) {
+    realNumLights += 1;
     float _receiveShadow = receiveShadowRate;
 #ifdef RECEIVE_SHADOW
     _receiveShadow = _receiveShadow * texture2D(receiveShadowSampler, mainUv).r * vReceiveShadowInfos.y;
@@ -129,17 +164,9 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
     vec3 _col = mix(_shade.rgb, _lit.rgb, _lightIntensity);
 
     // Direct Light
-    vec3 _lighting = _lightColor;
-    _lighting = mix(_lighting, vec3(max(EPS_COL, max(_lighting.x, max(_lighting.y, _lighting.z)))), lightColorAttenuation); // color atten
-#ifdef MTOON_FORWARD_ADD
-    _lighting *= 0.5; // darken if additional light
-    _lighting *= min(0., _dotNL) + 1.0; // darken dotNL < 0 area by using half lambert
-    _lighting *= shadowAttenuation; // darken if receiving shadow
-#else
-    // base light does not darken.
-    // Make material receive shadow.
-    _lighting *= shadowAttenuation;
-#endif
+    vec3 _lightingGain = totalDirectLighting/float(realNumLights);
+    _lightingGain = sinh(_lightingGain / 2.);
+    vec3 _lighting = directLightingArr[realNumLights] * _lightingGain;
     _col *= _lighting;
 
     // Indirect Light
@@ -148,7 +175,7 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
     vec3 _toonedGI = vAmbientColor.rgb; // TODO: GI
     vec3 _indirectLighting = mix(_toonedGI, vAmbientColor.rgb, indirectLightIntensity);
     _indirectLighting = mix(_indirectLighting, vec3(max(EPS_COL, max(_indirectLighting.x, max(_indirectLighting.y, _indirectLighting.z)))), lightColorAttenuation); // color atten
-    _col += _indirectLighting * _lit.rgb;
+    _col += _indirectLighting * _lit.rgb * _lightingGain;
 
     _col = min(_col.rgb, _lit.rgb); // comment out if you want to PBR absolutely.
 #endif
@@ -167,7 +194,7 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
     _rimColor = _rimColor * texture2D(rimSampler, vRimUV + mainUv).rgb * vRimInfos.y;
 #endif
     vec3 _rim = pow(clamp(1.0 - dot(worldNormal, worldView) + rimLift, 0.0, 1.0), rimFresnelPower) * _rimColor.rgb;
-    _col += mix(_rim * _rimLighting, vec3(0.0), isOutline);
+    _col += mix(_rim * _rimLighting * _lightingGain, vec3(0.0), isOutline);
 
     // additive matcap
 #ifdef MTOON_FORWARD_ADD
@@ -179,7 +206,7 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
     // uv.y is reversed
     _matCapUv.y = (1.0 - _matCapUv.y);
     vec3 _matCapLighting = texture2D(matCapSampler, _matCapUv).rgb * vMatCapInfos.y;
-    _col += mix(_matCapLighting, vec3(0.0), isOutline);
+    _col += mix(_matCapLighting * _lightingGain, vec3(0.0), isOutline);
 #endif
 #endif
 
@@ -190,7 +217,7 @@ vec4 computeMToonDiffuseLighting(vec3 worldView, vec3 worldNormal, vec2 mainUv, 
 #ifdef EMISSIVE
      _emission *= texture2D(emissiveSampler, mainUv).rgb * vEmissiveInfos.y;
 #endif
-     _col += mix(_emission, vec3(0.0), isOutline);
+     _col += mix(_emission * _lightingGain, vec3(0.0), isOutline);
 #endif
 
     float _alpha = 1.0;
@@ -351,6 +378,8 @@ vec3 lightDirection = vec3(0.0, 1.0, 0.0);
 vec4 mtoonDiffuse = vec4(0.0, 0.0, 0.0, 1.0);
 
 // 通常の lightFragment ではなく、自前実装の mtoonLightFragment を読み込む
+#include<mtoonLightPreFragment>[0..maxSimultaneousLights]
+realNumLights = 0;    // reset light count
 #include<mtoonLightFragment>[0..maxSimultaneousLights]
 
 #ifdef VERTEXALPHA

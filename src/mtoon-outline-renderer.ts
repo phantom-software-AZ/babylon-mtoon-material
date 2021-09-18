@@ -12,6 +12,7 @@ const BASE_NAME = 'MToonOutline';
 
 /**
  * MToonMaterial を別のパスで描画するレンダラ
+ * TODO: The whole outline rendering has a huge performance cost. Needs a better way.
  * @see OutlineRenderer
  */
 export class MToonOutlineRenderer implements ISceneComponent {

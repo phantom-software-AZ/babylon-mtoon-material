@@ -31,6 +31,7 @@ const UboDeclaration = require("./shaders/ubo-declaration.vert");
 const VertexDeclaration = require("./shaders/vertex-declaration.vert");
 const FragmentDeclaration = require("./shaders/fragment-declaration.frag");
 const BumpFragment = require("./shaders/bump-fragment.frag");
+const LightPreFragment = require("./shaders/light-fragment-precalculation.frag");
 const LightFragment = require("./shaders/light-fragment.frag");
 const VertexShader = require("./shaders/mtoon.vert");
 const FragmentShader = require("./shaders/mtoon.frag");
@@ -342,7 +343,7 @@ export class MToonMaterial extends PushMaterial {
     public useGlossinessFromSpecularMapAlpha!: boolean;
 
     @serialize("maxSimultaneousLights")
-    private _maxSimultaneousLights = 16;
+    private _maxSimultaneousLights = 4;
     /**
      * Defines the maximum number of lights that can be used in the material
      */
@@ -587,6 +588,7 @@ export class MToonMaterial extends PushMaterial {
             Effect.IncludesShadersStore.mtoonUboDeclaration = UboDeclaration;
             Effect.IncludesShadersStore.mtoonVertexDeclaration = VertexDeclaration;
             Effect.IncludesShadersStore.mtoonFragmentDeclaration = FragmentDeclaration;
+            Effect.IncludesShadersStore.mtoonLightPreFragment = LightPreFragment;
             Effect.IncludesShadersStore.mtoonLightFragment = LightFragment;
             Effect.IncludesShadersStore.mtoonBumpFragment = BumpFragment;
             Effect.ShadersStore.mtoonVertexShader = VertexShader;
