@@ -5,7 +5,7 @@ import { Scene } from '@babylonjs/core/scene';
 import { ISceneComponent, SceneComponentConstants } from '@babylonjs/core/sceneComponent';
 import { Nullable } from '@babylonjs/core/types';
 import { Matrix } from '@babylonjs/core/Maths/math';
-import { MToonMaterial } from './mtoon-material';
+import {CullMode, MToonMaterial} from './mtoon-material';
 import { Constants } from '@babylonjs/core/Engines/constants';
 
 const BASE_NAME = 'MToonOutline';
@@ -88,49 +88,39 @@ export class MToonOutlineRenderer implements ISceneComponent {
         const renderingMesh = subMesh.getRenderingMesh();
         const effectiveMesh = replacementMesh ? replacementMesh : renderingMesh;
 
-        const storedCullMode = this.material.cullMode;
-        this.material.cullMode = this.material.outlineCullMode;
+        // This cullmode change is terrible for performance because it makes
+        // materials dirty each frame.
+        // const changeCullMode = this.material.cullMode == CullMode.Back;
+        // const storedCullMode = this.material.cullMode;
+        // if (changeCullMode) {
+        //     this.material.cullMode = this.material.outlineCullMode;
+        // }
         this._engine.enableEffect(effect);
         renderingMesh._bind(subMesh, effect, this.material.fillMode);
 
         this._engine.setZOffset(-1);
 
         // レンダリング実行
-        if (Engine.Version.startsWith('4.0') || Engine.Version.startsWith('4.1')) {
-            // for 4.0, 4.1
-            (renderingMesh as any)._processRendering(
-                subMesh,
-                effect,
-                this.material.fillMode,
-                batch,
-                this.isHardwareInstancedRendering(subMesh, batch),
-                (isInstance: boolean, world: Matrix, effectiveMaterial: MToonMaterial) => {
-                    effectiveMaterial.bindForSubMesh(world, mesh, subMesh);
-                    effect.setMatrix('world', world);
-                    effect.setFloat('isOutline', 1.0);
-                },
-                this.material,
-            );
-        } else {
-            // for 4.2.0-alpha.0 +
-            (renderingMesh as any)._processRendering(
-                effectiveMesh,
-                subMesh,
-                effect,
-                this.material.fillMode,
-                batch,
-                this.isHardwareInstancedRendering(subMesh, batch),
-                (isInstance: boolean, world: Matrix, effectiveMaterial: MToonMaterial) => {
-                    effectiveMaterial.bindForSubMesh(world, mesh, subMesh);
-                    effect.setMatrix('world', world);
-                    effect.setFloat('isOutline', 1.0);
-                },
-                this.material,
-            );
-        }
+        // for 4.2.0-alpha.0 +
+        (renderingMesh as any)._processRendering(
+            effectiveMesh,
+            subMesh,
+            effect,
+            this.material.fillMode,
+            batch,
+            this.isHardwareInstancedRendering(subMesh, batch),
+            (isInstance: boolean, world: Matrix, effectiveMaterial: MToonMaterial) => {
+                effectiveMaterial.bindForSubMesh(world, mesh, subMesh);
+                effect.setMatrix("world", world);
+                effect.setFloat("isOutline", 1.0);
+            },
+            this.material,
+        );
 
         this._engine.setZOffset(0);
-        this.material.cullMode = storedCullMode;
+        // if (changeCullMode) {
+        //     this.material.cullMode = storedCullMode;
+        // }
     }
 
     /**
