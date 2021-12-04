@@ -24,7 +24,7 @@ import { DetailMapConfiguration } from "@babylonjs/core/Materials/material.detai
 import { getInspectableCustomProperties } from "./inspectable-custom-properties";
 import { MToonMaterialDefines } from "./mtoon-material-defines";
 import { MToonOutlineRenderer } from "./mtoon-outline-renderer";
-import {MaterialFlags, _TypeStore} from "@babylonjs/core";
+import {MaterialFlags, RegisterClass} from "@babylonjs/core";
 
 // シェーダ文字列を取得
 const UboDeclaration = require("./shaders/ubo-declaration.vert");
@@ -686,12 +686,12 @@ export class MToonMaterial extends PushMaterial {
             }
         }
 
-        if (!subMesh._materialDefines) {
+        if (!subMesh.materialDefines) {
             subMesh.materialDefines = new MToonMaterialDefines();
         }
 
         const scene = this.getScene();
-        const defines = <MToonMaterialDefines>subMesh._materialDefines;
+        const defines = <MToonMaterialDefines>subMesh.materialDefines;
         if (this._isReadyForSubMesh(subMesh)) {
             return true;
         }
@@ -1197,7 +1197,7 @@ export class MToonMaterial extends PushMaterial {
     public bindForSubMesh(world: Matrix, mesh: Mesh, subMesh: SubMesh): void {
         const scene = this.getScene();
 
-        const defines = <MToonMaterialDefines>subMesh._materialDefines;
+        const defines = <MToonMaterialDefines>subMesh.materialDefines;
         if (!defines) {
             return;
         }
@@ -1675,4 +1675,4 @@ export class MToonMaterial extends PushMaterial {
 
 }
 
-_TypeStore.RegisteredTypes["BABYLON.MToonMaterial"] = MToonMaterial;
+RegisterClass("BABYLON.MToonMaterial", MToonMaterial);
