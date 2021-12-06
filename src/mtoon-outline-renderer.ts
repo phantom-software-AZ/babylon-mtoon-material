@@ -24,6 +24,17 @@ export class MToonOutlineRenderer implements ISceneComponent {
     public static rendererId = 0;
 
     /**
+     * Defines a zOffset default Factor to prevent zFighting between the overlay and the mesh.
+     */
+    public zOffset = 1;
+
+    /**
+     * Defines a zOffset default Unit to prevent zFighting between the overlay and the mesh.
+     */
+    public zOffsetUnits = 4; // 4 to account for projection a bit by default
+
+
+    /**
      * @inheritdoc
      */
     public readonly name: string;
@@ -99,7 +110,8 @@ export class MToonOutlineRenderer implements ISceneComponent {
         this._engine.enableEffect(effect);
         renderingMesh._bind(subMesh, effect, this.material.fillMode);
 
-        this._engine.setZOffset(-1);
+        this._engine.setZOffset(-this.zOffset);
+        this._engine.setZOffsetUnits(-this.zOffsetUnits);
 
         // レンダリング実行
         // for 4.2.0-alpha.0 +
@@ -119,6 +131,7 @@ export class MToonOutlineRenderer implements ISceneComponent {
         );
 
         this._engine.setZOffset(0);
+        this._engine.setZOffsetUnits(0);
         // if (changeCullMode) {
         //     this.material.cullMode = storedCullMode;
         // }
@@ -130,7 +143,7 @@ export class MToonOutlineRenderer implements ISceneComponent {
     private _beforeRenderingMesh(mesh: Mesh, subMesh: SubMesh, batch: _InstancesBatch): void {
         this._savedDepthWrite = this._engine.getDepthWrite();
 
-        if (!this.willRender(subMesh)) {
+        if (!this.willRender(mesh)) {
             return;
         }
         const material = subMesh.getMaterial() as MToonMaterial;
@@ -165,7 +178,7 @@ export class MToonOutlineRenderer implements ISceneComponent {
      * このメッシュを描画した後に実行されるコールバック
      */
     private _afterRenderingMesh(mesh: Mesh, subMesh: SubMesh, batch: _InstancesBatch): void {
-        if (!this.willRender(subMesh)) {
+        if (!this.willRender(mesh)) {
             return;
         }
 
@@ -196,8 +209,9 @@ export class MToonOutlineRenderer implements ISceneComponent {
      /**
      * このメッシュでアウトラインを描画するかどうか
      */
-    private willRender(subMesh: SubMesh): boolean {
-        const material = subMesh.getMaterial() as Nullable<MToonMaterial>;
+    private willRender(mesh: Mesh): boolean {
+        // @ts-ignore
+        const material = mesh._internalMeshDataInfo._effectiveMaterial as Nullable<MToonMaterial>;
 
         if (!material || material.getClassName() !== 'MToonMaterial' || material.getOutlineRendererName() !== this.name) {
             // このコンポーネントの Material ではない

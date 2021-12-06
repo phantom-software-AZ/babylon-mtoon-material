@@ -712,7 +712,11 @@ export class MToonMaterial extends PushMaterial {
         MaterialHelper.PrepareDefinesForMultiview(scene, defines);
 
         // PrePass
+        const oit = this.needAlphaBlendingForMesh(mesh) && this.getScene().useOrderIndependentTransparency;
         MaterialHelper.PrepareDefinesForPrePass(scene, defines, this.canRenderToMRT);
+
+        // Order independant transparency
+        MaterialHelper.PrepareDefinesForOIT(scene, defines, oit);
 
         // Textures
         if (defines._areTexturesDirty) {
@@ -1386,6 +1390,11 @@ export class MToonMaterial extends PushMaterial {
                 if (this._uvAnimationMaskTexture) {
                     effect.setTexture("uvAnimationMaskSampler", this._uvAnimationMaskTexture);
                 }
+            }
+
+            // OIT with depth peeling
+            if (this.getScene().useOrderIndependentTransparency && this.needAlphaBlendingForMesh(mesh)) {
+                this.getScene().depthPeelingRenderer!.bind(effect);
             }
 
             this.detailMap.bindForSubMesh(ubo, scene, this.isFrozen);
