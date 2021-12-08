@@ -25,16 +25,24 @@ import { getInspectableCustomProperties } from "./inspectable-custom-properties"
 import { MToonMaterialDefines } from "./mtoon-material-defines";
 import { MToonOutlineRenderer } from "./mtoon-outline-renderer";
 import {MaterialFlags, RegisterClass} from "@babylonjs/core";
+import {bump_fragment_frag} from "./shaders-import/bump-fragment.frag";
+import {fragment_declaration_frag} from "./shaders-import/fragment-declaration.frag";
+import {light_fragment_frag} from "./shaders-import/light-fragment.frag";
+import {light_fragment_precalculation} from "./shaders-import/light-fragment-precalculation.frag";
+import {mtoon_frag} from "./shaders-import/mtoon.frag";
+import {mtoon_vert} from "./shaders-import/mtoon.vert";
+import {ubo_declaration_vert} from "./shaders-import/ubo-declaration.vert";
+import {vertex_declaration_vert} from "./shaders-import/vertex-declaration.vert";
 
 // シェーダ文字列を取得
-const UboDeclaration = require("./shaders/ubo-declaration.vert");
-const VertexDeclaration = require("./shaders/vertex-declaration.vert");
-const FragmentDeclaration = require("./shaders/fragment-declaration.frag");
-const BumpFragment = require("./shaders/bump-fragment.frag");
-const LightPreFragment = require("./shaders/light-fragment-precalculation.frag");
-const LightFragment = require("./shaders/light-fragment.frag");
-const VertexShader = require("./shaders/mtoon.vert");
-const FragmentShader = require("./shaders/mtoon.frag");
+const UboDeclaration = ubo_declaration_vert;
+const VertexDeclaration = vertex_declaration_vert;
+const FragmentDeclaration = fragment_declaration_frag;
+const BumpFragment = bump_fragment_frag;
+const LightPreFragment = light_fragment_precalculation;
+const LightFragment = light_fragment_frag;
+const VertexShader = mtoon_vert;
+const FragmentShader = mtoon_frag;
 
 /**
  * デバッグモード
