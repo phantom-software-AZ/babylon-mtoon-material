@@ -8,7 +8,6 @@ import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { SubMesh } from "@babylonjs/core/Meshes/subMesh";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
-import { PrePassConfiguration } from "@babylonjs/core/Materials/prePassConfiguration";
 
 import { Material, ICustomShaderNameResolveOptions } from "@babylonjs/core/Materials/material";
 import { PushMaterial } from "@babylonjs/core/Materials/pushMaterial";
@@ -19,7 +18,7 @@ import { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
 import { Constants } from "@babylonjs/core/Engines/constants";
 import { EffectFallbacks } from "@babylonjs/core/Materials/effectFallbacks";
 import { Effect, IEffectCreationOptions } from "@babylonjs/core/Materials/effect";
-import { DetailMapConfiguration } from "@babylonjs/core/Materials/material.detailMapConfiguration";
+import { DetailMapConfiguration } from "./material.detailMapConfiguration";
 
 import { getInspectableCustomProperties } from "./inspectable-custom-properties";
 import { MToonMaterialDefines } from "./mtoon-material-defines";
@@ -382,10 +381,6 @@ export class MToonMaterial extends PushMaterial {
      * 頂点アルファは非対応
      */
     public readonly useVertexAlpha = false;
-    /**
-     * Defines additional PrePass parameters for the material.
-     */
-    public readonly prePassConfiguration: PrePassConfiguration;
 
     /**
      * Can this material render to prepass
@@ -588,8 +583,6 @@ export class MToonMaterial extends PushMaterial {
      */
     public constructor(name: string, scene: Scene) {
         super(name, scene);
-
-        this.prePassConfiguration = new PrePassConfiguration();
 
         // シェーダストアに登録する
         if (!Effect.ShadersStore.mtoonVertexShader || !Effect.ShadersStore.mtoonFragmentShader) {
@@ -1046,9 +1039,6 @@ export class MToonMaterial extends PushMaterial {
             DetailMapConfiguration.AddUniforms(uniforms);
             DetailMapConfiguration.AddSamplers(samplers);
 
-            PrePassConfiguration.AddUniforms(uniforms);
-            PrePassConfiguration.AddSamplers(samplers);
-
             MaterialHelper.PrepareUniformsAndSamplersList(<IEffectCreationOptions>{
                 uniformsNames: uniforms,
                 uniformBuffersNames: uniformBuffers,
@@ -1223,9 +1213,6 @@ export class MToonMaterial extends PushMaterial {
         // Matrices Mesh.
         mesh.getMeshUniformBuffer().bindToEffect(effect, "Mesh");
         mesh.transferToEffect(world);
-
-        // PrePass
-        this.prePassConfiguration.bindForSubMesh(this._activeEffect, scene, mesh, world, this.isFrozen);
 
         // Normal Matrix
         if (defines.OBJECTSPACE_NORMALMAP) {
